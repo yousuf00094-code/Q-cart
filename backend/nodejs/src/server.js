@@ -3,24 +3,25 @@ require('dotenv').config();
 const app    = require('./app');
 const { pool } = require('./config/database');
 const logger = require('./utils/logger');
+const { runMigrations } = require('../scripts/migrate');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
-const start = async () => {
-  // Bind to port immediately so health checks pass while DB/migrations start
+const start = () => {
+  logger.info('Starting Q Cart API...');
+
   const server = app.listen(PORT, '0.0.0.0', () => {
-    logger.info(`Q Cart API listening on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
+    logger.info(`Listening on host 0.0.0.0 port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
+    logger.info('Health endpoint ready');
+
+    // Run migrations after port is bound so health checks pass immediately.
+    // A migration failure is logged but never crashes the server.
+    logger.info('[migrate] Migration started');
+    runMigrations()
+      .then(() => logger.info('[migrate] Migration completed'))
+      .catch((err) => logger.error('[migrate] Migration failed — server remains up', { error: err.message }));
   });
 
-  // Verify DB connectivity after listen — non-fatal so the process stays up
-  try {
-    await pool.query('SELECT 1');
-    logger.info('PostgreSQL connection established');
-  } catch (err) {
-    logger.error('PostgreSQL not ready at startup — will retry on first request', { error: err.message });
-  }
-
-  // Graceful shutdown
   const shutdown = async (signal) => {
     logger.info(`${signal} received — shutting down gracefully`);
     server.close(async () => {

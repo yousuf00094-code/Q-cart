@@ -9,8 +9,8 @@ const pool = new Pool({
 });
 
 pool.on('error', (err) => {
-  console.error('Unexpected PostgreSQL pool error', err);
-  process.exit(1);
+  // Log but don't exit — the pool will recover; crashing here kills the health endpoint.
+  console.error('Unexpected PostgreSQL pool error:', err.message);
 });
 
 const query = (text, params) => pool.query(text, params);

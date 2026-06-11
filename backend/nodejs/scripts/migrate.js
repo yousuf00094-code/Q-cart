@@ -3,6 +3,9 @@
 /**
  * Runs all SQL migration files in order, then seeds demo data.
  * Safe to run on every deploy — all SQL files are idempotent.
+ *
+ * Exported as runMigrations() for use by server.js after app.listen().
+ * Also auto-runs when invoked directly: node scripts/migrate.js
  */
 
 const { Client } = require('pg');
@@ -18,7 +21,7 @@ const seeds = [
   path.join(__dirname, '../src/db/seeds/002_demo_accounts.sql'),
 ];
 
-async function run() {
+async function runMigrations() {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   await client.connect();
   console.log('[migrate] Connected to PostgreSQL');
@@ -41,10 +44,12 @@ async function run() {
   }
 
   await client.end();
-  console.log('[migrate] All done.');
 }
 
-run().catch(err => {
-  console.error('[migrate] FATAL:', err.message);
-  process.exit(1);
-});
+module.exports = { runMigrations };
+
+if (require.main === module) {
+  runMigrations()
+    .then(() => { console.log('[migrate] All done.'); process.exit(0); })
+    .catch((err) => { console.error('[migrate] FATAL:', err.message); process.exit(1); });
+}
