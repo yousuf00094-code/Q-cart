@@ -1,10 +1,10 @@
 require('dotenv').config();
 
-const path       = require('path');
-const express    = require('express');
-const helmet     = require('helmet');
-const cors       = require('cors');
-const morgan     = require('morgan');
+const path        = require('path');
+const express     = require('express');
+const helmet      = require('helmet');
+const cors        = require('cors');
+const morgan      = require('morgan');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
 
@@ -15,25 +15,31 @@ const logger = require('./utils/logger');
 
 const app = express();
 
-// ── Security ─────────────────────────────────────────────────────────────
+// ── Health check — before every middleware ────────────────────────────────
+// Render (and any infrastructure probe) sends GET /v1/health with no Origin
+// header. Registering this route first guarantees it is never blocked by
+// CORS, rate-limiting, authentication, or any other middleware.
+app.get('/v1/health', (_req, res) =>
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.0' })
+);
+
+// ── Security ──────────────────────────────────────────────────────────────
 app.use(helmet());
 app.set('trust proxy', 1);
 
-// ── CORS ─────────────────────────────────────────────────────────────────
-const allowedOrigins = (process.env.CORS_ORIGINS || '')
-  .split(',').map((o) => o.trim()).filter(Boolean);
-const isProd = process.env.NODE_ENV === 'production';
+// ── CORS ──────────────────────────────────────────────────────────────────
+// CORS_ORIGINS is a comma-separated list of allowed browser origins.
+// The special value "*" permits any browser origin (suitable for open/demo APIs).
+// Requests without an Origin header are server-to-server or CLI tools — CORS
+// does not apply to them; pass them through unconditionally.
+const rawOrigins = (process.env.CORS_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean);
+const allowAllOrigins = rawOrigins.includes('*');
 
 app.use(cors({
   origin: (origin, cb) => {
-    // In production, require an Origin header and validate it against the allowlist.
-    // In development, pass null-origin requests (curl, Postman, local tools).
-    if (!origin) {
-      return isProd
-        ? cb(new Error('CORS: requests without an Origin header are not allowed'))
-        : cb(null, true);
-    }
-    if (allowedOrigins.includes(origin)) return cb(null, true);
+    if (!origin) return cb(null, true);           // no Origin = not a browser cross-origin request
+    if (allowAllOrigins) return cb(null, true);   // CORS_ORIGINS=*
+    if (rawOrigins.includes(origin)) return cb(null, true);
     cb(new Error(`CORS: origin ${origin} is not allowed`));
   },
   credentials: true,

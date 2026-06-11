@@ -14,8 +14,15 @@ const start = () => {
     logger.info(`Listening on host 0.0.0.0 port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
     logger.info('Health endpoint ready');
 
-    // Run migrations after port is bound so health checks pass immediately.
-    // A migration failure is logged but never crashes the server.
+    // All post-listen tasks run in background — they never block health checks.
+
+    // 1. Verify DB reachability
+    logger.info('Database connection started');
+    pool.query('SELECT 1')
+      .then(() => logger.info('Database connection completed'))
+      .catch((err) => logger.error('Database connection failed — requests will fail until DB is reachable', { error: err.message }));
+
+    // 2. Run schema migrations + optional demo seed
     logger.info('[migrate] Migration started');
     runMigrations()
       .then(() => logger.info('[migrate] Migration completed'))
