@@ -19,11 +19,21 @@ app.use(helmet());
 app.set('trust proxy', 1);
 
 // ── CORS ─────────────────────────────────────────────────────────────────
-const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map((o) => o.trim());
+const allowedOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',').map((o) => o.trim()).filter(Boolean);
+const isProd = process.env.NODE_ENV === 'production';
+
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-    cb(new Error('Not allowed by CORS'));
+    // In production, require an Origin header and validate it against the allowlist.
+    // In development, pass null-origin requests (curl, Postman, local tools).
+    if (!origin) {
+      return isProd
+        ? cb(new Error('CORS: requests without an Origin header are not allowed'))
+        : cb(null, true);
+    }
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    cb(new Error(`CORS: origin ${origin} is not allowed`));
   },
   credentials: true,
 }));

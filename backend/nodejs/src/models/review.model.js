@@ -6,10 +6,16 @@ const findById = async (id) => {
 };
 
 const findByProductAndUser = async (productId, userId, orderId) => {
-  const { rows } = await query(
-    'SELECT id FROM reviews WHERE product_id = $1 AND user_id = $2 AND order_id = $3',
-    [productId, userId, orderId]
-  );
+  // NULL != NULL in SQL, so we can't use `= $3` when orderId is null
+  const { rows } = orderId
+    ? await query(
+        'SELECT id FROM reviews WHERE product_id = $1 AND user_id = $2 AND order_id = $3',
+        [productId, userId, orderId]
+      )
+    : await query(
+        'SELECT id FROM reviews WHERE product_id = $1 AND user_id = $2 AND order_id IS NULL',
+        [productId, userId]
+      );
   return rows[0] || null;
 };
 
@@ -59,11 +65,13 @@ const listByProduct = async (productId, { limit, offset, rating, sort }) => {
 
 const create = async ({ productId, userId, orderId, rating, title, body, images, isVerified }) => {
   const { rows } = await query(
-    `INSERT INTO reviews (product_id, user_id, order_id, rating, title, body, images, is_verified)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    `INSERT INTO reviews
+       (product_id, user_id, order_id, rating, title, body, images, is_verified, is_approved)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
      RETURNING id, rating, title, body, created_at`,
     [productId, userId, orderId || null, rating, title || null, body || null,
-     images || [], isVerified || false]
+     images || [], isVerified || false,
+     true] // auto-approve; add admin moderation queue via PATCH /reviews/:id/approve when needed
   );
   return rows[0];
 };

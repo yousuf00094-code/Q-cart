@@ -23,6 +23,21 @@ const findById = async (id) => {
   return rows[0] || null;
 };
 
+// Batch fetch multiple products by ID — used by checkout to avoid N+1 queries
+const findManyByIds = async (ids) => {
+  if (!ids.length) return [];
+  const { rows } = await query(
+    `SELECT ${SAFE_COLUMNS}
+       FROM products p
+       LEFT JOIN categories  c ON c.id = p.category_id
+       LEFT JOIN suppliers   s ON s.id = p.supplier_id
+       LEFT JOIN inventory   i ON i.product_id = p.id
+      WHERE p.id = ANY($1::uuid[])`,
+    [ids]
+  );
+  return rows;
+};
+
 const findBySlug = async (slug) => {
   const { rows } = await query(
     `SELECT ${SAFE_COLUMNS}
@@ -36,7 +51,10 @@ const findBySlug = async (slug) => {
   return rows[0] || null;
 };
 
-const list = async ({ limit, offset, categoryId, supplierId, search,
+// cursor: { id, created_at } from decodeCursor — when present, uses keyset
+// pagination instead of OFFSET. Fetch limit+1 rows so the caller can detect
+// whether a next page exists without running a separate COUNT query.
+const list = async ({ limit, offset, cursor, categoryId, supplierId, search,
   minPrice, maxPrice, minRating, inStock, isActive, isFeatured, sort }) => {
   const conditions = [];
   const values = [];
@@ -56,20 +74,43 @@ const list = async ({ limit, offset, categoryId, supplierId, search,
     idx++;
   }
 
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const orderMap = {
-    price_asc:    'p.price ASC',
-    price_desc:   'p.price DESC',
-    rating_desc:  'p.average_rating DESC',
-    sold_desc:    'p.total_sold DESC',
-    created_at_desc: 'p.created_at DESC',
+    price_asc:       'p.price ASC, p.id ASC',
+    price_desc:      'p.price DESC, p.id DESC',
+    rating_desc:     'p.average_rating DESC, p.id DESC',
+    sold_desc:       'p.total_sold DESC, p.id DESC',
+    created_at_desc: 'p.created_at DESC, p.id DESC',
   };
-  const orderBy = orderMap[sort] || 'p.created_at DESC';
+  const orderBy = orderMap[sort] || 'p.created_at DESC, p.id DESC';
 
+  // Cursor mode: no OFFSET, no COUNT — O(1) pagination regardless of page depth
+  if (cursor) {
+    conditions.push(
+      `(p.created_at < $${idx}::timestamptz OR ` +
+      `(p.created_at = $${idx}::timestamptz AND p.id < $${idx + 1}::uuid))`
+    );
+    values.push(cursor.created_at, cursor.id);
+    idx += 2;
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const { rows } = await query(
+      `SELECT ${SAFE_COLUMNS}
+         FROM products p
+         LEFT JOIN categories  c ON c.id = p.category_id
+         LEFT JOIN suppliers   s ON s.id = p.supplier_id
+         LEFT JOIN inventory   i ON i.product_id = p.id
+       ${where}
+       ORDER BY ${orderBy}
+       LIMIT $${idx}`,
+      [...values, limit + 1] // fetch one extra to detect next page
+    );
+    return { rows, total: null, cursorMode: true };
+  }
+
+  // Offset mode (used by admin endpoints that need total counts)
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const countRes = await query(
-    `SELECT COUNT(*) FROM products p
-       LEFT JOIN inventory i ON i.product_id = p.id
-       ${where}`,
+    `SELECT COUNT(*) FROM products p LEFT JOIN inventory i ON i.product_id = p.id ${where}`,
     values
   );
   const { rows } = await query(
@@ -83,7 +124,7 @@ const list = async ({ limit, offset, categoryId, supplierId, search,
      LIMIT $${idx} OFFSET $${idx + 1}`,
     [...values, limit, offset]
   );
-  return { rows, total: parseInt(countRes.rows[0].count, 10) };
+  return { rows, total: parseInt(countRes.rows[0].count, 10), cursorMode: false };
 };
 
 const create = async (data) => {
@@ -140,10 +181,10 @@ const remove = async (id) => {
 };
 
 const incrementSold = async (id, qty, client) => {
-  const q = client || require('../config/database').query;
-  await (client
-    ? client.query('UPDATE products SET total_sold = total_sold + $1 WHERE id = $2', [qty, id])
-    : q('UPDATE products SET total_sold = total_sold + $1 WHERE id = $2', [qty, id]));
+  const fn = client
+    ? (t, v) => client.query(t, v)
+    : (t, v) => query(t, v);
+  await fn('UPDATE products SET total_sold = total_sold + $1 WHERE id = $2', [qty, id]);
 };
 
-module.exports = { findById, findBySlug, list, create, update, remove, incrementSold };
+module.exports = { findById, findManyByIds, findBySlug, list, create, update, remove, incrementSold };

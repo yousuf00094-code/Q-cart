@@ -1,5 +1,7 @@
 const winston = require('winston');
 
+// All output goes to stdout/stderr so container log drivers (CloudWatch, Datadog,
+// etc.) capture it automatically. File transports are wrong for ephemeral containers.
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   format: winston.format.combine(
@@ -15,13 +17,7 @@ const logger = winston.createLogger({
           })
         )
   ),
-  transports: [
-    new winston.transports.Console(),
-    ...(process.env.NODE_ENV === 'production'
-      ? [new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-         new winston.transports.File({ filename: 'logs/combined.log' })]
-      : []),
-  ],
+  transports: [new winston.transports.Console()],
 });
 
 module.exports = logger;
