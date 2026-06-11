@@ -18,6 +18,15 @@ class SupplierService {
     return res['data'] as List<dynamic>;
   }
 
+  static Future<List<dynamic>> getOrderStatusBreakdown() async {
+    final res = await ApiClient.get('/supplier/analytics');
+    // breakdown comes from a separate call on the analytics endpoint
+    // fall back to empty list if not present
+    final data = res['data'] as Map<String, dynamic>? ?? {};
+    final breakdown = data['order_status_breakdown'];
+    return breakdown is List ? breakdown : <dynamic>[];
+  }
+
   // ── Ratings ────────────────────────────────────────────────────────────────
 
   static Future<Map<String, dynamic>> getRatings({
@@ -26,13 +35,15 @@ class SupplierService {
     String? productId,
     bool? replied,
   }) async {
-    final params = {
+    final params = <String, String>{
       'page': page.toString(),
       if (rating != null) 'rating': rating.toString(),
       if (productId != null) 'product_id': productId,
       if (replied != null) 'replied': replied.toString(),
     };
-    final qs = params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
+    final qs = params.entries
+        .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
+        .join('&');
     return ApiClient.get('/supplier/ratings?$qs');
   }
 
@@ -47,8 +58,12 @@ class SupplierService {
 
   // ── Payouts ────────────────────────────────────────────────────────────────
 
-  static Future<Map<String, dynamic>> getPayouts({int page = 1, String? status}) async {
-    final qs = 'page=$page${status != null ? '&status=${Uri.encodeComponent(status)}' : ''}';
+  static Future<Map<String, dynamic>> getPayouts({
+    int page = 1,
+    String? status,
+  }) async {
+    final qs =
+        'page=$page${status != null ? '&status=${Uri.encodeComponent(status)}' : ''}';
     return ApiClient.get('/supplier/payouts?$qs');
   }
 
@@ -59,8 +74,12 @@ class SupplierService {
 
   // ── Shipments ──────────────────────────────────────────────────────────────
 
-  static Future<Map<String, dynamic>> getShipments({int page = 1, String? status}) async {
-    final qs = 'page=$page${status != null ? '&status=${Uri.encodeComponent(status)}' : ''}';
+  static Future<Map<String, dynamic>> getShipments({
+    int page = 1,
+    String? status,
+  }) async {
+    final qs =
+        'page=$page${status != null ? '&status=${Uri.encodeComponent(status)}' : ''}';
     return ApiClient.get('/supplier/shipments?$qs');
   }
 
@@ -69,7 +88,8 @@ class SupplierService {
     return res['data'] as Map<String, dynamic>;
   }
 
-  static Future<Map<String, dynamic>> createShipment(Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> createShipment(
+      Map<String, dynamic> data) async {
     final res = await ApiClient.post('/supplier/shipments', data);
     return res['data'] as Map<String, dynamic>;
   }
@@ -94,30 +114,63 @@ class SupplierService {
   static Future<Map<String, dynamic>> getProducts({
     int page = 1,
     String? status,
+    String? search,
   }) async {
-    final qs = 'page=$page${status != null ? '&status=${Uri.encodeComponent(status)}' : ''}';
-    return ApiClient.get('/products?$qs');
+    final params = <String, String>{
+      'page': page.toString(),
+      if (status != null) 'status': status,
+      if (search != null && search.isNotEmpty) 'search': search,
+    };
+    final qs = params.entries
+        .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
+        .join('&');
+    return ApiClient.get('/supplier/products?$qs');
   }
 
-  static Future<Map<String, dynamic>> submitProduct(Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> submitProduct(
+      Map<String, dynamic> data) async {
     final res = await ApiClient.post('/products', data);
     return res['data'] as Map<String, dynamic>;
   }
 
   // ── Orders ─────────────────────────────────────────────────────────────────
 
-  static Future<Map<String, dynamic>> getOrders({int page = 1, String? status}) async {
-    final qs = 'page=$page${status != null ? '&status=${Uri.encodeComponent(status)}' : ''}';
-    return ApiClient.get('/orders?$qs');
+  static Future<Map<String, dynamic>> getOrders({
+    int page = 1,
+    String? status,
+    String? search,
+  }) async {
+    final params = <String, String>{
+      'page': page.toString(),
+      if (status != null) 'status': status,
+      if (search != null && search.isNotEmpty) 'search': search,
+    };
+    final qs = params.entries
+        .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
+        .join('&');
+    return ApiClient.get('/supplier/orders?$qs');
   }
 
   // ── Inventory ──────────────────────────────────────────────────────────────
 
-  static Future<Map<String, dynamic>> getInventory({int page = 1}) async {
-    return ApiClient.get('/inventory?page=$page');
+  static Future<Map<String, dynamic>> getInventory({
+    int page = 1,
+    bool? lowStock,
+    String? search,
+  }) async {
+    final params = <String, String>{
+      'page': page.toString(),
+      if (lowStock == true) 'low_stock': 'true',
+      if (search != null && search.isNotEmpty) 'search': search,
+    };
+    final qs = params.entries
+        .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
+        .join('&');
+    return ApiClient.get('/supplier/inventory?$qs');
   }
 
-  static Future<void> adjustInventory(String productId, int delta, String reason) async {
+  static Future<void> adjustInventory(
+      String productId, int delta, String reason) async {
     await ApiClient.post('/inventory/$productId/adjust', {
       'quantity_delta': delta,
       'notes': reason,

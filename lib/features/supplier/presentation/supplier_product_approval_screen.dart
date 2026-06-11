@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/services/supplier_service.dart';
+import '../../../core/services/api_client.dart';
 import 'supplier_product_submission_screen.dart';
 
 class SupplierProductApprovalScreen extends StatefulWidget {
@@ -18,86 +20,15 @@ class _SupplierProductApprovalScreenState
 
   static const _filters = ['All', 'Pending', 'Approved', 'Rejected', 'Draft'];
 
-  final List<_ProductSubmission> _products = [
-    _ProductSubmission(
-      id: 'PRD-001',
-      name: 'Organic Medjool Dates 500g',
-      sku: 'ORG-DATE-500',
-      category: 'Food & Grocery',
-      price: 45.00,
-      status: _ApprovalStatus.approved,
-      submittedAt: DateTime(2026, 6, 1),
-      reviewedAt: DateTime(2026, 6, 3),
-      reviewerNote: 'Product meets all quality standards.',
-      images: 3,
-    ),
-    _ProductSubmission(
-      id: 'PRD-002',
-      name: 'Premium Saffron 5g',
-      sku: 'SAFF-5G-PREM',
-      category: 'Food & Grocery',
-      price: 89.00,
-      status: _ApprovalStatus.pendingReview,
-      submittedAt: DateTime(2026, 6, 8),
-      reviewedAt: null,
-      reviewerNote: null,
-      images: 2,
-    ),
-    _ProductSubmission(
-      id: 'PRD-003',
-      name: 'Camel Milk Powder 250g',
-      sku: 'CAML-MIK-250',
-      category: 'Dairy & Eggs',
-      price: 32.00,
-      status: _ApprovalStatus.rejected,
-      submittedAt: DateTime(2026, 5, 28),
-      reviewedAt: DateTime(2026, 5, 30),
-      reviewerNote:
-          'Images are too low resolution. Please upload at least 800×800px images and provide a full ingredient list.',
-      images: 1,
-    ),
-    _ProductSubmission(
-      id: 'PRD-004',
-      name: 'Za\'atar Spice Blend 200g',
-      sku: 'ZAT-BLEND-200',
-      category: 'Food & Grocery',
-      price: 18.50,
-      status: _ApprovalStatus.active,
-      submittedAt: DateTime(2026, 5, 10),
-      reviewedAt: DateTime(2026, 5, 12),
-      reviewerNote: 'Approved and live on storefront.',
-      images: 4,
-    ),
-    _ProductSubmission(
-      id: 'PRD-005',
-      name: 'Halal Beef Jerky 100g',
-      sku: 'HLL-BEF-JRK',
-      category: 'Snacks',
-      price: 22.00,
-      status: _ApprovalStatus.draft,
-      submittedAt: DateTime(2026, 6, 10),
-      reviewedAt: null,
-      reviewerNote: null,
-      images: 0,
-    ),
-    _ProductSubmission(
-      id: 'PRD-006',
-      name: 'Rose Water 500ml',
-      sku: 'ROSE-WTR-500',
-      category: 'Beverages',
-      price: 12.75,
-      status: _ApprovalStatus.pendingReview,
-      submittedAt: DateTime(2026, 6, 9),
-      reviewedAt: null,
-      reviewerNote: null,
-      images: 2,
-    ),
-  ];
+  List<_ProductSubmission>? _products;
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: _filters.length, vsync: this);
+    _fetchData();
   }
 
   @override
@@ -106,15 +37,49 @@ class _SupplierProductApprovalScreenState
     super.dispose();
   }
 
+  Future<void> _fetchData() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final res = await SupplierService.getProducts(page: 1);
+      if (!mounted) return;
+      final data = res['data'] as List<dynamic>? ?? [];
+      setState(() {
+        _products = data.map((r) {
+          final m = r as Map<String, dynamic>;
+          final isActive = m['is_active'] == true;
+          return _ProductSubmission(
+            id: m['id']?.toString() ?? '',
+            name: m['name']?.toString() ?? '',
+            sku: m['sku']?.toString() ?? '',
+            category: m['category_name']?.toString() ?? '',
+            price: double.tryParse(m['price']?.toString() ?? '0') ?? 0,
+            status: isActive ? _ApprovalStatus.active : _ApprovalStatus.pendingReview,
+            submittedAt: DateTime.tryParse(m['created_at']?.toString() ?? '') ?? DateTime.now(),
+            reviewedAt: null,
+            reviewerNote: null,
+            images: 0,
+          );
+        }).toList();
+        _loading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() { _error = e.message; _loading = false; });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _error = 'Failed to load products. Pull down to retry.'; _loading = false; });
+    }
+  }
+
   List<_ProductSubmission> get _filtered {
-    if (_selectedFilter == 'All') return _products;
-    return _products.where((p) {
+    final all = _products ?? [];
+    if (_selectedFilter == 'All') return all;
+    return all.where((p) {
       switch (_selectedFilter) {
         case 'Pending':
           return p.status == _ApprovalStatus.pendingReview;
         case 'Approved':
-          return p.status == _ApprovalStatus.approved ||
-              p.status == _ApprovalStatus.active;
+          return p.status == _ApprovalStatus.approved || p.status == _ApprovalStatus.active;
         case 'Rejected':
           return p.status == _ApprovalStatus.rejected;
         case 'Draft':
@@ -126,7 +91,7 @@ class _SupplierProductApprovalScreenState
   }
 
   int _count(_ApprovalStatus s) =>
-      _products.where((p) => p.status == s).length;
+      (_products ?? []).where((p) => p.status == s).length;
 
   @override
   Widget build(BuildContext context) {
@@ -148,27 +113,45 @@ class _SupplierProductApprovalScreenState
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildSummaryBar(),
-          _buildFilterChips(),
-          const Divider(height: 1, color: AppColors.divider),
-          Expanded(
-            child: _filtered.isEmpty
-                ? _buildEmpty()
-                : ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _filtered.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) => _ProductCard(
-                      product: _filtered[i],
-                      onResubmit: _resubmit,
-                      onDelete: _delete,
-                    ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.error_outline, size: 48, color: AppColors.textSecondary),
+                      const SizedBox(height: 12),
+                      Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
+                      const SizedBox(height: 16),
+                      ElevatedButton(onPressed: _fetchData, child: const Text('Retry')),
+                    ]),
                   ),
-          ),
-        ],
-      ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _fetchData,
+                  child: Column(
+                    children: [
+                      _buildSummaryBar(),
+                      _buildFilterChips(),
+                      const Divider(height: 1, color: AppColors.divider),
+                      Expanded(
+                        child: _filtered.isEmpty
+                            ? _buildEmpty()
+                            : ListView.separated(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: _filtered.length,
+                                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                                itemBuilder: (_, i) => _ProductCard(
+                                  product: _filtered[i],
+                                  onResubmit: _resubmit,
+                                  onDelete: _delete,
+                                ),
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
     );
   }
 
@@ -266,7 +249,7 @@ class _SupplierProductApprovalScreenState
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           TextButton(
             onPressed: () {
-              setState(() => _products.remove(p));
+              setState(() => _products?.remove(p));
               Navigator.pop(ctx);
             },
             child: const Text('Delete', style: TextStyle(color: Colors.red)),

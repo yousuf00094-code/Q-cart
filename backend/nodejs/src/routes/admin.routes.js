@@ -60,4 +60,12 @@ router.get('/payouts',
   payoutsCtrl.listAll
 );
 
+// GET /v1/admin/supplier-performance?page=1&limit=24
+router.get('/supplier-performance',
+  queryValidator('page').optional().isInt({ min: 1 }),
+  queryValidator('limit').optional().isInt({ min: 1, max: 100 }),
+  validate,
+  ctrl.getSupplierPerformance
+);
+
 module.exports = router;

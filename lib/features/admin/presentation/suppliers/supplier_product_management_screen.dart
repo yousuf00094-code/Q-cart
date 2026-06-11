@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/admin_service.dart';
+import '../../../../core/services/api_client.dart';
 
 class AdminSupplierProductManagementScreen extends StatefulWidget {
   const AdminSupplierProductManagementScreen({super.key});
@@ -17,34 +19,16 @@ class _AdminSupplierProductManagementScreenState
   String _searchQuery = '';
   String _supplierFilter = 'all';
 
-  final List<_SupplierProduct> _products = [
-    _SupplierProduct('Wireless Earbuds Pro', 'TechStore Qatar', 'Electronics',
-        149.00, 142, 'approved', true, 4.8, 'PRD-001'),
-    _SupplierProduct('Mechanical Keyboard', 'TechStore Qatar', 'Electronics',
-        249.00, 38, 'approved', true, 4.6, 'PRD-002'),
-    _SupplierProduct('Casual Linen Shirt', 'Doha Fashion House', 'Clothing',
-        89.00, 0, 'approved', false, 4.1, 'PRD-003'),
-    _SupplierProduct('Garden Tool Set', 'Qatar Home Essentials', 'Home & Garden',
-        175.00, 12, 'pending', false, 0.0, 'PRD-004'),
-    _SupplierProduct('Running Shoes Pro', 'Gulf Sports Co.', 'Sports',
-        320.00, 5, 'pending', false, 0.0, 'PRD-005'),
-    _SupplierProduct('USB-C Hub 7-in-1', 'TechStore Qatar', 'Electronics',
-        89.00, 5, 'approved', true, 4.5, 'PRD-006'),
-    _SupplierProduct('Yoga Mat Premium', 'Gulf Sports Co.', 'Sports',
-        55.00, 23, 'approved', true, 3.9, 'PRD-007'),
-    _SupplierProduct('Ceramic Coffee Mug', 'Qatar Home Essentials', 'Home & Garden',
-        32.00, 67, 'rejected', false, 0.0, 'PRD-008'),
-  ];
-
-  final _suppliers = [
-    'all', 'TechStore Qatar', 'Doha Fashion House',
-    'Qatar Home Essentials', 'Gulf Sports Co.',
-  ];
+  List<_SupplierProduct>? _products;
+  List<String> _supplierNames = ['all'];
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 3, vsync: this);
+    _fetchData();
   }
 
   @override
@@ -54,8 +38,96 @@ class _AdminSupplierProductManagementScreenState
     super.dispose();
   }
 
+  Future<void> _fetchData() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final res = await AdminService.getProducts(
+        page: 1,
+        search: _searchQuery.isEmpty ? null : _searchQuery,
+      );
+      if (!mounted) return;
+      final data = res['data'] as List<dynamic>? ?? [];
+      final products = data.map((r) {
+        final m = r as Map<String, dynamic>;
+        final isActive = m['is_active'] == true;
+        final rawStatus = m['approval_status']?.toString();
+        final approvalStatus = rawStatus ?? (isActive ? 'approved' : 'pending');
+        return _SupplierProduct(
+          id: m['id']?.toString() ?? '',
+          name: m['name']?.toString() ?? '',
+          supplier: m['supplier_name']?.toString() ?? m['supplier']?.toString() ?? '',
+          category: m['category']?.toString() ?? '',
+          price: double.tryParse(m['price']?.toString() ?? '0') ?? 0,
+          stock: int.tryParse(m['stock_quantity']?.toString() ?? '0') ?? 0,
+          approvalStatus: approvalStatus,
+          isActive: isActive,
+          rating: double.tryParse(m['avg_rating']?.toString() ?? '0') ?? 0,
+          sku: m['sku']?.toString() ?? '',
+        );
+      }).toList();
+
+      final names = products.map((p) => p.supplier).where((s) => s.isNotEmpty).toSet().toList()..sort();
+
+      setState(() {
+        _products = products;
+        _supplierNames = ['all', ...names];
+        _loading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() { _error = e.message; _loading = false; });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _error = 'Failed to load products. Pull down to retry.'; _loading = false; });
+    }
+  }
+
+  Future<void> _approveProduct(_SupplierProduct product) async {
+    try {
+      await AdminService.updateProductStatus(product.id, isActive: true);
+      if (!mounted) return;
+      setState(() {
+        product.approvalStatus = 'approved';
+        product.isActive = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to approve product')));
+    }
+  }
+
+  Future<void> _rejectProduct(_SupplierProduct product) async {
+    try {
+      await AdminService.updateProductStatus(product.id, isActive: false);
+      if (!mounted) return;
+      setState(() {
+        product.approvalStatus = 'rejected';
+        product.isActive = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to reject product')));
+    }
+  }
+
+  Future<void> _toggleActive(_SupplierProduct product) async {
+    final next = !product.isActive;
+    try {
+      await AdminService.updateProductStatus(product.id, isActive: next);
+      if (!mounted) return;
+      setState(() => product.isActive = next);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update product status')));
+    }
+  }
+
   List<_SupplierProduct> _filtered(String status) {
-    var list = _products.where((p) {
+    final base = _products ?? [];
+    var list = base.where((p) {
       final q = _searchQuery.toLowerCase();
       final matchSearch = p.name.toLowerCase().contains(q) ||
           p.sku.toLowerCase().contains(q) ||
@@ -71,7 +143,7 @@ class _AdminSupplierProductManagementScreenState
   }
 
   int get _pendingCount =>
-      _products.where((p) => p.approvalStatus == 'pending').length;
+      (_products ?? []).where((p) => p.approvalStatus == 'pending').length;
 
   @override
   Widget build(BuildContext context) {
@@ -127,21 +199,44 @@ class _AdminSupplierProductManagementScreenState
           ],
         ),
       ),
-      body: Column(
-        children: [
-          _buildFilters(),
-          Expanded(
-            child: TabBarView(
-              controller: _tabCtrl,
-              children: [
-                _buildList('all'),
-                _buildList('pending'),
-                _buildList('approved'),
-              ],
-            ),
-          ),
-        ],
-      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.error_outline,
+                          size: 48, color: AppColors.textSecondary),
+                      const SizedBox(height: 12),
+                      Text(_error!,
+                          textAlign: TextAlign.center,
+                          style:
+                              const TextStyle(color: AppColors.textSecondary)),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                          onPressed: _fetchData, child: const Text('Retry')),
+                    ]),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _fetchData,
+                  child: Column(
+                    children: [
+                      _buildFilters(),
+                      Expanded(
+                        child: TabBarView(
+                          controller: _tabCtrl,
+                          children: [
+                            _buildList('all'),
+                            _buildList('pending'),
+                            _buildList('approved'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
     );
   }
 
@@ -152,7 +247,10 @@ class _AdminSupplierProductManagementScreenState
         children: [
           TextField(
             controller: _searchCtrl,
-            onChanged: (v) => setState(() => _searchQuery = v),
+            onChanged: (v) {
+              setState(() => _searchQuery = v);
+              _fetchData();
+            },
             decoration: InputDecoration(
               hintText: 'Search by name, SKU, or supplier…',
               prefixIcon: const Icon(Icons.search),
@@ -162,6 +260,7 @@ class _AdminSupplierProductManagementScreenState
                       onPressed: () {
                         _searchCtrl.clear();
                         setState(() => _searchQuery = '');
+                        _fetchData();
                       },
                     )
                   : null,
@@ -182,7 +281,7 @@ class _AdminSupplierProductManagementScreenState
             height: 36,
             child: ListView(
               scrollDirection: Axis.horizontal,
-              children: _suppliers.map((s) {
+              children: _supplierNames.map((s) {
                 final selected = _supplierFilter == s;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -240,13 +339,12 @@ class _AdminSupplierProductManagementScreenState
       itemBuilder: (_, i) => _ProductAdminCard(
         product: list[i],
         onApprove: list[i].approvalStatus == 'pending'
-            ? () => setState(() => list[i].approvalStatus = 'approved')
+            ? () => _approveProduct(list[i])
             : null,
         onReject: list[i].approvalStatus == 'pending'
             ? () => _showRejectProductDialog(list[i])
             : null,
-        onToggleActive: () =>
-            setState(() => list[i].isActive = !list[i].isActive),
+        onToggleActive: () => _toggleActive(list[i]),
         onView: () => _showProductSheet(list[i]),
       ),
     );
@@ -284,7 +382,7 @@ class _AdminSupplierProductManagementScreenState
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              setState(() => product.approvalStatus = 'rejected');
+              _rejectProduct(product);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child:
@@ -337,22 +435,25 @@ class _AdminSupplierProductManagementScreenState
                 _DetailRow(Icons.star_outlined, 'Rating',
                     '${product.rating.toStringAsFixed(1)} ★'),
               const Divider(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Active on Store',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textPrimary)),
-                  Switch(
-                    value: product.isActive,
-                    onChanged: (v) {
-                      setState(() => product.isActive = v);
-                      Navigator.pop(context);
-                    },
-                    activeColor: AppColors.secondary,
-                  ),
-                ],
+              StatefulBuilder(
+                builder: (ctx, setLocal) => Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Active on Store',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textPrimary)),
+                    Switch(
+                      value: product.isActive,
+                      onChanged: (v) async {
+                        await _toggleActive(product);
+                        setLocal(() {});
+                        if (mounted) Navigator.pop(context);
+                      },
+                      activeColor: AppColors.secondary,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -592,12 +693,22 @@ class _DetailRow extends StatelessWidget {
 }
 
 class _SupplierProduct {
-  final String name, supplier, category, sku;
+  final String id, name, supplier, category, sku;
   final double price, rating;
   final int stock;
   String approvalStatus;
   bool isActive;
 
-  _SupplierProduct(this.name, this.supplier, this.category, this.price,
-      this.stock, this.approvalStatus, this.isActive, this.rating, this.sku);
+  _SupplierProduct({
+    required this.id,
+    required this.name,
+    required this.supplier,
+    required this.category,
+    required this.price,
+    required this.stock,
+    required this.approvalStatus,
+    required this.isActive,
+    required this.rating,
+    required this.sku,
+  });
 }

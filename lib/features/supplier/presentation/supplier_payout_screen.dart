@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/services/supplier_service.dart';
+import '../../../core/services/api_client.dart';
 
 class SupplierPayoutScreen extends StatefulWidget {
   const SupplierPayoutScreen({super.key});
@@ -12,38 +14,105 @@ class _SupplierPayoutScreenState extends State<SupplierPayoutScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabCtrl;
 
-  final List<_PayoutRecord> _payouts = [
-    _PayoutRecord('PAY-2301', 'QAR 8,450.00', 'completed',
-        '1 Jun 2026', '28 May – 31 May', 'QIIB ••••4521'),
-    _PayoutRecord('PAY-2245', 'QAR 11,230.50', 'completed',
-        '1 May 2026', '28 Apr – 30 Apr', 'QIIB ••••4521'),
-    _PayoutRecord('PAY-2198', 'QAR 7,890.00', 'completed',
-        '1 Apr 2026', '29 Mar – 31 Mar', 'QIIB ••••4521'),
-    _PayoutRecord('PAY-2301B', 'QAR 4,120.75', 'pending',
-        'Est. 15 Jun 2026', '1 Jun – 14 Jun', 'QIIB ••••4521'),
-  ];
+  List<_PayoutRecord>? _payouts;
+  bool _loading = true;
+  String? _error;
+  String _filterStatus = 'all';
 
-  final List<_Transaction> _transactions = [
-    _Transaction('ORD-4201', 'Order Sale', '+QAR 245.00', 'credit', '10 Jun'),
-    _Transaction('ORD-4198', 'Order Sale', '+QAR 89.50', 'credit', '9 Jun'),
-    _Transaction('COM-4201', 'Q Cart Commission', '-QAR 24.50', 'debit', '10 Jun'),
-    _Transaction('ORD-4185', 'Order Sale', '+QAR 512.00', 'credit', '8 Jun'),
-    _Transaction('COM-4198', 'Q Cart Commission', '-QAR 8.95', 'debit', '9 Jun'),
-    _Transaction('REF-4130', 'Refund Issued', '-QAR 89.50', 'debit', '7 Jun'),
-    _Transaction('ORD-4172', 'Order Sale', '+QAR 67.00', 'credit', '7 Jun'),
-    _Transaction('COM-4185', 'Q Cart Commission', '-QAR 51.20', 'debit', '8 Jun'),
-  ];
+  // Per-payout items cache: payout id → list of items
+  final Map<String, List<_PayoutItem>> _payoutItems = {};
+  final Set<String> _loadingItems = {};
 
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 3, vsync: this);
+    _fetchPayouts();
   }
 
   @override
   void dispose() {
     _tabCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchPayouts() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final raw = await SupplierService.getPayouts(
+        page: 1,
+        status: _filterStatus == 'all' ? null : _filterStatus,
+      );
+      if (!mounted) return;
+      final data = raw['data'] as List<dynamic>? ?? [];
+      setState(() {
+        _payouts = data.map((e) => _PayoutRecord.fromJson(e as Map<String, dynamic>)).toList();
+        _loading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Failed to load. Pull down to retry.';
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchPayoutItems(String payoutId) async {
+    if (_payoutItems.containsKey(payoutId) || _loadingItems.contains(payoutId)) return;
+    setState(() => _loadingItems.add(payoutId));
+    try {
+      final raw = await SupplierService.getPayout(payoutId);
+      if (!mounted) return;
+      final items = (raw['items'] as List<dynamic>? ?? [])
+          .map((e) => _PayoutItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+      setState(() {
+        _payoutItems[payoutId] = items;
+        _loadingItems.remove(payoutId);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingItems.remove(payoutId));
+    }
+  }
+
+  String _formatDate(String iso) {
+    final dt = DateTime.tryParse(iso) ?? DateTime.now();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
+
+  String _formatPeriod(String start, String end) {
+    final s = DateTime.tryParse(start) ?? DateTime.now();
+    final e = DateTime.tryParse(end) ?? DateTime.now();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${s.day} ${months[s.month - 1]} – ${e.day} ${months[e.month - 1]}';
+  }
+
+  double get _totalPaid {
+    if (_payouts == null) return 0;
+    return _payouts!
+        .where((p) => p.status == 'paid' || p.status == 'completed')
+        .fold(0.0, (sum, p) => sum + p.netAmount);
+  }
+
+  double get _totalPending {
+    if (_payouts == null) return 0;
+    return _payouts!
+        .where((p) => p.status == 'pending')
+        .fold(0.0, (sum, p) => sum + p.netAmount);
   }
 
   @override
@@ -90,23 +159,48 @@ class _SupplierPayoutScreenState extends State<SupplierPayoutScreen>
   }
 
   Widget _buildOverviewTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          _buildBalanceCard(),
-          const SizedBox(height: 16),
-          _buildPayoutBreakdown(),
-          const SizedBox(height: 16),
-          _buildBankDetails(),
-          const SizedBox(height: 16),
-          _buildPayoutScheduleCard(),
-        ],
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: AppColors.textSecondary),
+              const SizedBox(height: 12),
+              Text(_error!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.textSecondary)),
+              const SizedBox(height: 16),
+              ElevatedButton(onPressed: _fetchPayouts, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _fetchPayouts,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            _buildBalanceCard(),
+            const SizedBox(height: 16),
+            _buildPayoutBreakdown(),
+            const SizedBox(height: 16),
+            _buildBankDetails(),
+            const SizedBox(height: 16),
+            _buildPayoutScheduleCard(),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildBalanceCard() {
+    final pending = _totalPending;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -123,17 +217,17 @@ class _SupplierPayoutScreenState extends State<SupplierPayoutScreen>
           const Text('Available Balance',
               style: TextStyle(color: Colors.white70, fontSize: 13)),
           const SizedBox(height: 6),
-          const Text('QAR 4,120.75',
-              style: TextStyle(
+          Text('QAR ${pending.toStringAsFixed(2)}',
+              style: const TextStyle(
                   color: Colors.white,
                   fontSize: 32,
                   fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           Row(
             children: [
-              _BalanceStat('Pending', 'QAR 1,240.00'),
+              _BalanceStat('Pending', 'QAR ${pending.toStringAsFixed(2)}'),
               _BalanceStat('Processing', 'QAR 0.00'),
-              _BalanceStat('Next Payout', '15 Jun'),
+              _BalanceStat('Next Payout', '15th'),
             ],
           ),
           const SizedBox(height: 16),
@@ -158,6 +252,9 @@ class _SupplierPayoutScreenState extends State<SupplierPayoutScreen>
   }
 
   Widget _buildPayoutBreakdown() {
+    final paid = _totalPaid;
+    final pending = _totalPending;
+    final total = paid + pending;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -168,19 +265,17 @@ class _SupplierPayoutScreenState extends State<SupplierPayoutScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('This Period (Jun 1–14)',
+          const Text('Payout Summary',
               style: TextStyle(
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
                   fontSize: 15)),
           const SizedBox(height: 14),
           ...[
-            ('Gross Sales', 'QAR 5,720.50', false),
-            ('Q Cart Commission (10%)', '- QAR 572.05', false),
-            ('VAT Collected (5%)', '- QAR 286.00', false),
-            ('Refunds Issued', '- QAR 89.50', false),
-            ('COD Collection Fee', '- QAR 20.00', false),
-            ('Net Payout', 'QAR 4,752.95', true),
+            ('Total Payouts', 'QAR ${total.toStringAsFixed(2)}', false),
+            ('Paid Out', 'QAR ${paid.toStringAsFixed(2)}', false),
+            ('Pending', 'QAR ${pending.toStringAsFixed(2)}', false),
+            ('Net Balance', 'QAR ${pending.toStringAsFixed(2)}', true),
           ].map((row) => Column(
                 children: [
                   if (row.$3) const Divider(height: 16),
@@ -244,10 +339,10 @@ class _SupplierPayoutScreenState extends State<SupplierPayoutScreen>
             ],
           ),
           const SizedBox(height: 12),
-          _BankDetailRow(Icons.account_balance_outlined, 'Bank', 'QIIB – Qatar International Islamic Bank'),
-          _BankDetailRow(Icons.credit_card_outlined, 'Account', '••••  ••••  ••••  4521'),
-          _BankDetailRow(Icons.person_outline, 'Account Name', 'TechStore Qatar LLC'),
-          _BankDetailRow(Icons.tag_outlined, 'IBAN', 'QA58 QIIB 0000 0000 1234 0000 4521'),
+          const _BankDetailRow(Icons.account_balance_outlined, 'Bank', 'On File'),
+          const _BankDetailRow(Icons.credit_card_outlined, 'Account', 'On File'),
+          const _BankDetailRow(Icons.person_outline, 'Account Name', 'On File'),
+          const _BankDetailRow(Icons.tag_outlined, 'IBAN', 'On File'),
         ],
       ),
     );
@@ -292,18 +387,149 @@ class _SupplierPayoutScreenState extends State<SupplierPayoutScreen>
   }
 
   Widget _buildPayoutsTab() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _payouts.length,
-      itemBuilder: (_, i) => _PayoutCard(payout: _payouts[i]),
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: AppColors.textSecondary),
+              const SizedBox(height: 12),
+              Text(_error!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.textSecondary)),
+              const SizedBox(height: 16),
+              ElevatedButton(onPressed: _fetchPayouts, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
+    final payouts = _payouts ?? [];
+    return Column(
+      children: [
+        _buildStatusFilter(),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _fetchPayouts,
+            child: payouts.isEmpty
+                ? ListView(
+                    children: const [
+                      SizedBox(height: 120),
+                      Center(
+                        child: Text('No payouts found',
+                            style: TextStyle(color: AppColors.textSecondary)),
+                      ),
+                    ],
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: payouts.length,
+                    itemBuilder: (_, i) => _PayoutCard(
+                      payout: payouts[i],
+                      formatDate: _formatDate,
+                      formatPeriod: _formatPeriod,
+                    ),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatusFilter() {
+    final filters = [
+      ('all', 'All'),
+      ('pending', 'Pending'),
+      ('paid', 'Paid'),
+    ];
+    return SizedBox(
+      height: 48,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        children: filters.map((f) {
+          final selected = _filterStatus == f.$1;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              label: Text(f.$2,
+                  style: TextStyle(
+                      color: selected ? AppColors.secondary : AppColors.textSecondary,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                      fontSize: 13)),
+              selected: selected,
+              onSelected: (_) {
+                setState(() => _filterStatus = f.$1);
+                _fetchPayouts();
+              },
+              selectedColor: AppColors.secondary.withOpacity(0.15),
+              checkmarkColor: AppColors.secondary,
+              backgroundColor: AppColors.background,
+              side: BorderSide(
+                  color: selected
+                      ? AppColors.secondary.withOpacity(0.4)
+                      : AppColors.divider),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 
   Widget _buildTransactionsTab() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _transactions.length,
-      itemBuilder: (_, i) => _TransactionRow(txn: _transactions[i]),
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: AppColors.textSecondary),
+              const SizedBox(height: 12),
+              Text(_error!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.textSecondary)),
+              const SizedBox(height: 16),
+              ElevatedButton(onPressed: _fetchPayouts, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
+    final payouts = _payouts ?? [];
+    return RefreshIndicator(
+      onRefresh: _fetchPayouts,
+      child: payouts.isEmpty
+          ? ListView(
+              children: const [
+                SizedBox(height: 120),
+                Center(
+                  child: Text('No transactions found',
+                      style: TextStyle(color: AppColors.textSecondary)),
+                ),
+              ],
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: payouts.length,
+              itemBuilder: (_, i) {
+                final payout = payouts[i];
+                final items = _payoutItems[payout.id];
+                final isLoadingItems = _loadingItems.contains(payout.id);
+                return _PayoutTransactionTile(
+                  payout: payout,
+                  items: items,
+                  isLoadingItems: isLoadingItems,
+                  formatDate: _formatDate,
+                  formatPeriod: _formatPeriod,
+                  onExpand: () => _fetchPayoutItems(payout.id),
+                );
+              },
+            ),
     );
   }
 
@@ -326,9 +552,9 @@ class _SupplierPayoutScreenState extends State<SupplierPayoutScreen>
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary)),
             const SizedBox(height: 8),
-            const Text(
-                'Available balance: QAR 4,120.75\nEarly payout fee: QAR 15 flat',
-                style: TextStyle(color: AppColors.textSecondary)),
+            Text(
+                'Available balance: QAR ${_totalPending.toStringAsFixed(2)}\nEarly payout fee: QAR 15 flat',
+                style: const TextStyle(color: AppColors.textSecondary)),
             const SizedBox(height: 16),
             const TextField(
               keyboardType: TextInputType.number,
@@ -406,9 +632,183 @@ class _SupplierPayoutScreenState extends State<SupplierPayoutScreen>
   }
 }
 
+// ── Transaction tile with expand-to-load items ──────────────────────────────
+
+class _PayoutTransactionTile extends StatefulWidget {
+  final _PayoutRecord payout;
+  final List<_PayoutItem>? items;
+  final bool isLoadingItems;
+  final String Function(String) formatDate;
+  final String Function(String, String) formatPeriod;
+  final VoidCallback onExpand;
+
+  const _PayoutTransactionTile({
+    required this.payout,
+    required this.items,
+    required this.isLoadingItems,
+    required this.formatDate,
+    required this.formatPeriod,
+    required this.onExpand,
+  });
+
+  @override
+  State<_PayoutTransactionTile> createState() => _PayoutTransactionTileState();
+}
+
+class _PayoutTransactionTileState extends State<_PayoutTransactionTile> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final payout = widget.payout;
+    final isPending = payout.status == 'pending';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () {
+              setState(() => _expanded = !_expanded);
+              if (!_expanded) widget.onExpand();
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: isPending
+                          ? const Color(0xFFF57F17).withOpacity(0.1)
+                          : const Color(0xFF2E7D32).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isPending ? Icons.hourglass_empty_outlined : Icons.receipt_long_outlined,
+                      color: isPending ? const Color(0xFFF57F17) : const Color(0xFF2E7D32),
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(payout.id,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textPrimary,
+                                fontSize: 13)),
+                        Text(
+                          '${widget.formatPeriod(payout.periodStart, payout.periodEnd)} · ${widget.formatDate(payout.periodStart)}',
+                          style: const TextStyle(
+                              fontSize: 11, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    'QAR ${payout.netAmount.toStringAsFixed(2)}',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: isPending ? const Color(0xFFF57F17) : const Color(0xFF2E7D32)),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    color: AppColors.textSecondary,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_expanded) ...[
+            const Divider(height: 1),
+            if (widget.isLoadingItems)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              )
+            else if (widget.items == null)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: Text('Could not load items.',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+              )
+            else if (widget.items!.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: Text('No line items.',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
+                child: Column(
+                  children: widget.items!.map((item) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(item.orderNumber,
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.textPrimary)),
+                              Text('Commission: QAR ${item.commission.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                      fontSize: 11, color: AppColors.textSecondary)),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text('QAR ${item.net.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF2E7D32))),
+                            Text('Gross: QAR ${item.gross.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                    fontSize: 11, color: AppColors.textSecondary)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  )).toList(),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Stateless widget classes ─────────────────────────────────────────────────
+
 class _PayoutCard extends StatelessWidget {
   final _PayoutRecord payout;
-  const _PayoutCard({required this.payout});
+  final String Function(String) formatDate;
+  final String Function(String, String) formatPeriod;
+  const _PayoutCard({
+    required this.payout,
+    required this.formatDate,
+    required this.formatPeriod,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -456,10 +856,10 @@ class _PayoutCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary)),
                 const SizedBox(height: 2),
-                Text(payout.period,
+                Text(formatPeriod(payout.periodStart, payout.periodEnd),
                     style: const TextStyle(
                         fontSize: 12, color: AppColors.textSecondary)),
-                Text('${payout.bank} · ${payout.date}',
+                Text('On File · ${formatDate(payout.periodStart)}',
                     style: const TextStyle(
                         fontSize: 11, color: AppColors.textSecondary)),
               ],
@@ -468,7 +868,7 @@ class _PayoutCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(payout.amount,
+              Text('QAR ${payout.netAmount.toStringAsFixed(2)}',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
@@ -495,69 +895,6 @@ class _PayoutCard extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TransactionRow extends StatelessWidget {
-  final _Transaction txn;
-  const _TransactionRow({required this.txn});
-
-  @override
-  Widget build(BuildContext context) {
-    final isCredit = txn.type == 'credit';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: isCredit
-                  ? const Color(0xFF2E7D32).withOpacity(0.1)
-                  : Colors.red.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              isCredit ? Icons.add_outlined : Icons.remove_outlined,
-              color: isCredit ? const Color(0xFF2E7D32) : Colors.red,
-              size: 18,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(txn.description,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textPrimary,
-                        fontSize: 13)),
-                Text('${txn.reference} · ${txn.date}',
-                    style: const TextStyle(
-                        fontSize: 11, color: AppColors.textSecondary)),
-              ],
-            ),
-          ),
-          Text(
-            txn.amount,
-            style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: isCredit
-                    ? const Color(0xFF2E7D32)
-                    : Colors.red),
           ),
         ],
       ),
@@ -619,14 +956,62 @@ class _BankDetailRow extends StatelessWidget {
   }
 }
 
+// ── Data models ───────────────────────────────────────────────────────────────
+
 class _PayoutRecord {
-  final String id, amount, status, date, period, bank;
-  const _PayoutRecord(
-      this.id, this.amount, this.status, this.date, this.period, this.bank);
+  final String id;
+  final double netAmount;
+  final double grossAmount;
+  final double commissionAmount;
+  final String status;
+  final String periodStart;
+  final String periodEnd;
+
+  const _PayoutRecord({
+    required this.id,
+    required this.netAmount,
+    required this.grossAmount,
+    required this.commissionAmount,
+    required this.status,
+    required this.periodStart,
+    required this.periodEnd,
+  });
+
+  factory _PayoutRecord.fromJson(Map<String, dynamic> j) {
+    return _PayoutRecord(
+      id: j['id']?.toString() ?? '',
+      netAmount: (j['net_amount'] as num?)?.toDouble() ?? 0.0,
+      grossAmount: (j['gross_amount'] as num?)?.toDouble() ?? 0.0,
+      commissionAmount: (j['commission_amount'] as num?)?.toDouble() ?? 0.0,
+      status: j['status']?.toString() ?? 'pending',
+      periodStart: j['period_start']?.toString() ?? '',
+      periodEnd: j['period_end']?.toString() ?? '',
+    );
+  }
 }
 
-class _Transaction {
-  final String reference, description, amount, type, date;
-  const _Transaction(
-      this.reference, this.description, this.amount, this.type, this.date);
+class _PayoutItem {
+  final String id;
+  final String orderNumber;
+  final double net;
+  final double gross;
+  final double commission;
+
+  const _PayoutItem({
+    required this.id,
+    required this.orderNumber,
+    required this.net,
+    required this.gross,
+    required this.commission,
+  });
+
+  factory _PayoutItem.fromJson(Map<String, dynamic> j) {
+    return _PayoutItem(
+      id: j['id']?.toString() ?? '',
+      orderNumber: j['order_number']?.toString() ?? '',
+      net: (j['net'] as num?)?.toDouble() ?? 0.0,
+      gross: (j['gross'] as num?)?.toDouble() ?? 0.0,
+      commission: (j['commission'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
 }

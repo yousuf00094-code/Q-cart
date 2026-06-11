@@ -233,6 +233,56 @@ const getSupplierPayoutSummary = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ── Supplier Performance ──────────────────────────────────────────────────────
+
+const getSupplierPerformance = async (req, res, next) => {
+  try {
+    const { parsePagination: pp, buildMeta: bm } = require('../utils/pagination');
+    const { page, limit, offset } = pp(req.query);
+
+    const [countRes, dataRes] = await Promise.all([
+      query(`SELECT COUNT(*) FROM suppliers WHERE status = 'active'`),
+      query(
+        `SELECT
+           s.id, s.name, s.category,
+           COALESCE(AVG(r.rating), 0)                              AS avg_rating,
+           COUNT(DISTINCT r.id)                                     AS review_count,
+           COUNT(DISTINCT o.id) FILTER (
+             WHERE o.status NOT IN ('cancelled','refunded')
+           )                                                        AS total_orders,
+           COALESCE(SUM(oi.total_price) FILTER (
+             WHERE o.status NOT IN ('cancelled','refunded')
+           ), 0)                                                    AS total_revenue,
+           COUNT(DISTINCT o.id) FILTER (
+             WHERE o.status = 'delivered'
+           ) * 100.0 / NULLIF(
+             COUNT(DISTINCT o.id) FILTER (
+               WHERE o.status NOT IN ('cancelled','refunded')
+             ), 0
+           )                                                        AS fulfillment_rate,
+           COUNT(DISTINCT o.id) FILTER (
+             WHERE o.status = 'cancelled'
+           ) * 100.0 / NULLIF(COUNT(DISTINCT o.id), 0)             AS cancellation_rate
+         FROM suppliers s
+         LEFT JOIN order_items oi ON oi.supplier_id = s.id
+         LEFT JOIN orders o ON o.id = oi.order_id
+         LEFT JOIN products p ON p.supplier_id = s.id
+         LEFT JOIN reviews r ON r.product_id = p.id AND r.is_approved = TRUE
+         WHERE s.status = 'active'
+         GROUP BY s.id
+         ORDER BY total_revenue DESC
+         LIMIT $1 OFFSET $2`,
+        [limit, offset]
+      ),
+    ]);
+
+    res.json({
+      data: dataRes.rows,
+      meta: bm(parseInt(countRes.rows[0].count, 10), page, limit),
+    });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   getDashboard,
   getRevenueReport,
@@ -241,4 +291,5 @@ module.exports = {
   getLowStockAlerts,
   getActivityFeed,
   getSupplierPayoutSummary,
+  getSupplierPerformance,
 };

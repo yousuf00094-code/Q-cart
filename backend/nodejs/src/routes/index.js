@@ -21,6 +21,7 @@ router.use('/supplier/analytics', require('./supplier_analytics.routes'));
 router.use('/supplier/ratings',   require('./supplier_ratings.routes'));
 router.use('/supplier/payouts',   require('./supplier_payouts.routes'));
 router.use('/supplier/shipments', require('./shipments.routes'));
+router.use('/supplier',           require('./supplier_portal.routes'));
 
 // ── Admin supplier risk scores ─────────────────────────────────────────────
 router.use('/admin/supplier-risk', require('./supplier_risk.routes'));

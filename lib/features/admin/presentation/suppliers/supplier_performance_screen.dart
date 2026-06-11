@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/admin_service.dart';
+import '../../../../core/services/api_client.dart';
 
 class AdminSupplierPerformanceScreen extends StatefulWidget {
   const AdminSupplierPerformanceScreen({super.key});
@@ -16,29 +18,60 @@ class _AdminSupplierPerformanceScreenState
   String _period = 'month';
   String _sortBy = 'revenue';
 
-  final List<_SupplierPerf> _suppliers = [
-    _SupplierPerf('TechStore Qatar', 'Electronics', 4.8, 142, 'QAR 72,650',
-        98.2, 96.5, 0.8, 'top', 'QAR 65,385', 72),
-    _SupplierPerf('AlFahad Electronics', 'Electronics', 4.6, 89, 'QAR 52,410',
-        95.1, 94.2, 1.2, 'good', 'QAR 47,169', 89),
-    _SupplierPerf('Doha Fashion House', 'Clothing', 4.4, 67, 'QAR 31,200',
-        91.8, 88.5, 3.5, 'average', 'QAR 28,080', 67),
-    _SupplierPerf('Gulf Sports Co.', 'Sports', 3.8, 34, 'QAR 18,900',
-        85.4, 79.2, 8.2, 'at_risk', 'QAR 17,010', 34),
-    _SupplierPerf('Qatar Home Essentials', 'Home & Garden', 4.2, 55,
-        'QAR 24,500', 93.2, 90.8, 2.1, 'good', 'QAR 22,050', 55),
-  ];
+  List<_SupplierPerf>? _suppliers;
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
+    _fetchData();
   }
 
   @override
   void dispose() {
     _tabCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchData() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final res = await AdminService.getSupplierPerformance();
+      if (!mounted) return;
+      final data = res['data'] as List<dynamic>? ?? [];
+      setState(() {
+        _suppliers = data.map((r) {
+          final m = r as Map<String, dynamic>;
+          final rating = double.tryParse(m['avg_rating']?.toString() ?? '0') ?? 0;
+          final fulfillment = double.tryParse(m['fulfillment_rate']?.toString() ?? '0') ?? 0;
+          final cancelRate = double.tryParse(m['cancellation_rate']?.toString() ?? '0') ?? 0;
+          final revenue = double.tryParse(m['total_revenue']?.toString() ?? '0') ?? 0;
+          final badge = rating >= 4.5 ? 'top' : rating >= 3.5 ? 'good' : rating >= 3.0 ? 'average' : 'at_risk';
+          return _SupplierPerf(
+            m['name']?.toString() ?? '',
+            m['category']?.toString() ?? '',
+            rating,
+            int.tryParse(m['total_orders']?.toString() ?? '0') ?? 0,
+            'QAR ${revenue.toStringAsFixed(0)}',
+            fulfillment,
+            100 - cancelRate,
+            cancelRate,
+            badge,
+            'QAR ${(revenue * 0.9).toStringAsFixed(0)}',
+            0,
+          );
+        }).toList();
+        _loading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() { _error = e.message; _loading = false; });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _error = 'Failed to load. Pull down to retry.'; _loading = false; });
+    }
   }
 
   @override
@@ -70,13 +103,23 @@ class _AdminSupplierPerformanceScreenState
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabCtrl,
-        children: [
-          _buildRankingsTab(),
-          _buildBenchmarksTab(),
-        ],
-      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.error_outline, size: 48, color: AppColors.textSecondary),
+                  const SizedBox(height: 12),
+                  Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
+                  const SizedBox(height: 16),
+                  ElevatedButton(onPressed: _fetchData, child: const Text('Retry')),
+                ])))
+              : RefreshIndicator(
+                  onRefresh: _fetchData,
+                  child: TabBarView(
+                    controller: _tabCtrl,
+                    children: [_buildRankingsTab(), _buildBenchmarksTab()],
+                  ),
+                ),
     );
   }
 
@@ -101,7 +144,7 @@ class _AdminSupplierPerformanceScreenState
   }
 
   List<_SupplierPerf> get _sortedSuppliers {
-    final list = [..._suppliers];
+    final list = [...(_suppliers ?? [])];
     list.sort((a, b) {
       return switch (_sortBy) {
         'rating' => b.rating.compareTo(a.rating),
@@ -165,14 +208,12 @@ class _AdminSupplierPerformanceScreenState
   }
 
   Widget _buildOverviewStrip() {
-    final topRevenue = _suppliers
-        .map((s) => double.tryParse(
-                s.revenue.replaceAll('QAR ', '').replaceAll(',', '')) ??
-            0)
+    final list = _suppliers ?? [];
+    final topRevenue = list
+        .map((s) => double.tryParse(s.revenue.replaceAll('QAR ', '').replaceAll(',', '')) ?? 0)
         .fold(0.0, (a, b) => a + b);
-    final avgRating = _suppliers.map((s) => s.rating).fold(0.0, (a, b) => a + b) /
-        _suppliers.length;
-    final atRisk = _suppliers.where((s) => s.badge == 'at_risk').length;
+    final avgRating = list.isEmpty ? 0.0 : list.map((s) => s.rating).fold(0.0, (a, b) => a + b) / list.length;
+    final atRisk = list.where((s) => s.badge == 'at_risk').length;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -197,26 +238,19 @@ class _AdminSupplierPerformanceScreenState
       child: Column(
         children: [
           _buildBenchmarkCard('Avg. Rating', [
-            for (final s in _suppliers)
-              _BenchmarkRow(s.name, s.rating / 5, s.rating.toStringAsFixed(1),
-                  const Color(0xFFFFB300)),
+            for (final s in (_suppliers ?? []))
+              _BenchmarkRow(s.name, s.rating / 5, s.rating.toStringAsFixed(1), const Color(0xFFFFB300)),
           ]),
           const SizedBox(height: 16),
           _buildBenchmarkCard('On-Time Delivery %', [
-            for (final s in _suppliers)
-              _BenchmarkRow(s.name, s.onTimeDelivery / 100,
-                  '${s.onTimeDelivery.toStringAsFixed(1)}%', AppColors.primary),
+            for (final s in (_suppliers ?? []))
+              _BenchmarkRow(s.name, s.onTimeDelivery / 100, '${s.onTimeDelivery.toStringAsFixed(1)}%', AppColors.primary),
           ]),
           const SizedBox(height: 16),
           _buildBenchmarkCard('Return Rate %', [
-            for (final s in _suppliers)
-              _BenchmarkRow(
-                s.name,
-                s.returnRate / 15,
-                '${s.returnRate.toStringAsFixed(1)}%',
-                s.returnRate > 5 ? Colors.red : const Color(0xFF2E7D32),
-                invertColors: true,
-              ),
+            for (final s in (_suppliers ?? []))
+              _BenchmarkRow(s.name, s.returnRate / 15, '${s.returnRate.toStringAsFixed(1)}%',
+                  s.returnRate > 5 ? Colors.red : const Color(0xFF2E7D32), invertColors: true),
           ]),
         ],
       ),
