@@ -1,0 +1,126 @@
+import 'api_client.dart';
+
+class SupplierService {
+  // ── Analytics ──────────────────────────────────────────────────────────────
+
+  static Future<Map<String, dynamic>> getDashboard() async {
+    final res = await ApiClient.get('/supplier/analytics');
+    return res['data'] as Map<String, dynamic>;
+  }
+
+  static Future<List<dynamic>> getDailyRevenue({int days = 30}) async {
+    final res = await ApiClient.get('/supplier/analytics/revenue?days=$days');
+    return res['data'] as List<dynamic>;
+  }
+
+  static Future<List<dynamic>> getTopProducts({int limit = 10}) async {
+    final res = await ApiClient.get('/supplier/analytics/top-products?limit=$limit');
+    return res['data'] as List<dynamic>;
+  }
+
+  // ── Ratings ────────────────────────────────────────────────────────────────
+
+  static Future<Map<String, dynamic>> getRatings({
+    int page = 1,
+    int? rating,
+    String? productId,
+    bool? replied,
+  }) async {
+    final params = {
+      'page': page.toString(),
+      if (rating != null) 'rating': rating.toString(),
+      if (productId != null) 'product_id': productId,
+      if (replied != null) 'replied': replied.toString(),
+    };
+    final qs = params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
+    return ApiClient.get('/supplier/ratings?$qs');
+  }
+
+  static Future<Map<String, dynamic>> getRatingsSummary() async {
+    final res = await ApiClient.get('/supplier/ratings/summary');
+    return res['data'] as Map<String, dynamic>;
+  }
+
+  static Future<void> replyToReview(String reviewId, String reply) async {
+    await ApiClient.post('/supplier/ratings/$reviewId/reply', {'reply': reply});
+  }
+
+  // ── Payouts ────────────────────────────────────────────────────────────────
+
+  static Future<Map<String, dynamic>> getPayouts({int page = 1, String? status}) async {
+    final qs = 'page=$page${status != null ? '&status=${Uri.encodeComponent(status)}' : ''}';
+    return ApiClient.get('/supplier/payouts?$qs');
+  }
+
+  static Future<Map<String, dynamic>> getPayout(String id) async {
+    final res = await ApiClient.get('/supplier/payouts/$id');
+    return res['data'] as Map<String, dynamic>;
+  }
+
+  // ── Shipments ──────────────────────────────────────────────────────────────
+
+  static Future<Map<String, dynamic>> getShipments({int page = 1, String? status}) async {
+    final qs = 'page=$page${status != null ? '&status=${Uri.encodeComponent(status)}' : ''}';
+    return ApiClient.get('/supplier/shipments?$qs');
+  }
+
+  static Future<Map<String, dynamic>> getShipment(String id) async {
+    final res = await ApiClient.get('/supplier/shipments/$id');
+    return res['data'] as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> createShipment(Map<String, dynamic> data) async {
+    final res = await ApiClient.post('/supplier/shipments', data);
+    return res['data'] as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> updateShipment(
+    String id,
+    Map<String, dynamic> data,
+  ) async {
+    final res = await ApiClient.patch('/supplier/shipments/$id', data);
+    return res['data'] as Map<String, dynamic>;
+  }
+
+  static Future<void> addShipmentEvent(
+    String shipmentId,
+    Map<String, dynamic> event,
+  ) async {
+    await ApiClient.post('/supplier/shipments/$shipmentId/events', event);
+  }
+
+  // ── Products ───────────────────────────────────────────────────────────────
+
+  static Future<Map<String, dynamic>> getProducts({
+    int page = 1,
+    String? status,
+  }) async {
+    final qs = 'page=$page${status != null ? '&status=${Uri.encodeComponent(status)}' : ''}';
+    return ApiClient.get('/products?$qs');
+  }
+
+  static Future<Map<String, dynamic>> submitProduct(Map<String, dynamic> data) async {
+    final res = await ApiClient.post('/products', data);
+    return res['data'] as Map<String, dynamic>;
+  }
+
+  // ── Orders ─────────────────────────────────────────────────────────────────
+
+  static Future<Map<String, dynamic>> getOrders({int page = 1, String? status}) async {
+    final qs = 'page=$page${status != null ? '&status=${Uri.encodeComponent(status)}' : ''}';
+    return ApiClient.get('/orders?$qs');
+  }
+
+  // ── Inventory ──────────────────────────────────────────────────────────────
+
+  static Future<Map<String, dynamic>> getInventory({int page = 1}) async {
+    return ApiClient.get('/inventory?page=$page');
+  }
+
+  static Future<void> adjustInventory(String productId, int delta, String reason) async {
+    await ApiClient.post('/inventory/$productId/adjust', {
+      'quantity_delta': delta,
+      'notes': reason,
+    });
+  }
+}

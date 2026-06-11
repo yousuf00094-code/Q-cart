@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
+import 'core/services/auth_service.dart';
 import 'features/home/presentation/home_screen.dart';
 import 'features/supplier/supplier_portal_app.dart';
 import 'features/supplier/presentation/supplier_login_screen.dart';
@@ -18,7 +19,9 @@ import 'features/admin/presentation/suppliers/supplier_performance_screen.dart';
 import 'features/admin/presentation/suppliers/supplier_risk_score_screen.dart';
 import 'features/admin/presentation/suppliers/supplier_product_management_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AuthService.init();
   runApp(const QCartApp());
 }
 
