@@ -1,9 +1,9 @@
 const { withTransaction, query } = require('../config/database');
-const OrderModel    = require('../models/order.model');
-const ProductModel  = require('../models/product.model');
+const OrderModel     = require('../models/order.model');
+const ProductModel   = require('../models/product.model');
 const InventoryModel = require('../models/inventory.model');
-const CouponModel   = require('../models/coupon.model');
-const { AppError }  = require('../middleware/errorHandler');
+const CouponModel    = require('../models/coupon.model');
+const { AppError }   = require('../middleware/errorHandler');
 
 const DELIVERY_FEE      = 15.00;
 const FREE_DELIVERY_MIN = 200.00;
@@ -13,19 +13,24 @@ const applyDiscount = (coupon, subtotal) => {
   let discount = coupon.discount_type === 'percentage'
     ? subtotal * (coupon.discount_value / 100)
     : parseFloat(coupon.discount_value);
-
   if (coupon.max_discount_amount) {
     discount = Math.min(discount, parseFloat(coupon.max_discount_amount));
   }
   return parseFloat(discount.toFixed(2));
 };
 
+// Batch-fetch all products in one query to avoid N+1 round trips
 const validateCartItems = async (items) => {
+  const productIds = [...new Set(items.map((i) => i.product_id))];
+
+  const products = await ProductModel.findManyByIds(productIds);
+  const productMap = new Map(products.map((p) => [p.id, p]));
+
   const outOfStock = [];
-  const resolved = [];
+  const resolved   = [];
 
   for (const item of items) {
-    const product = await ProductModel.findById(item.product_id);
+    const product = productMap.get(item.product_id);
     if (!product || !product.is_active) {
       throw new AppError(`Product ${item.product_id} is not available.`, 422, 'PRODUCT_UNAVAILABLE');
     }
@@ -43,7 +48,7 @@ const validateCartItems = async (items) => {
 
 const estimate = async ({ items, couponCode }) => {
   const resolved = await validateCartItems(items);
-  const subtotal = resolved.reduce((s, i) => s + i.product.price * i.quantity, 0);
+  const subtotal  = resolved.reduce((s, i) => s + i.product.price * i.quantity, 0);
 
   let coupon = null;
   if (couponCode) {
@@ -57,18 +62,45 @@ const estimate = async ({ items, couponCode }) => {
       throw new AppError(`Minimum order of QAR ${coupon.min_order_amount} required.`, 422, 'ORDER_BELOW_MINIMUM');
   }
 
-  const discount = applyDiscount(coupon, subtotal);
+  const discount    = applyDiscount(coupon, subtotal);
   const deliveryFee = subtotal - discount >= FREE_DELIVERY_MIN ? 0 : DELIVERY_FEE;
-  const total = parseFloat((subtotal - discount + deliveryFee).toFixed(2));
+  const total       = parseFloat((subtotal - discount + deliveryFee).toFixed(2));
 
   return { subtotal, discount_amount: discount, delivery_fee: deliveryFee, total,
     coupon_applied: !!coupon, free_delivery: deliveryFee === 0 };
 };
 
 const placeOrder = async ({ userId, addressId, couponCode, paymentMethod, items, notes }) => {
+  // Pre-validate outside the transaction (no row locks) for a fast early exit
+  const resolved = await validateCartItems(items);
+
   return withTransaction(async (client) => {
-    const resolved = await validateCartItems(items);
-    const subtotal = resolved.reduce((s, i) => s + i.product.price * i.quantity, 0);
+    // Lock inventory rows to prevent overselling under concurrent requests.
+    // Any other concurrent checkout for the same products will wait here.
+    const productIds = resolved.map((r) => r.product.id);
+    await client.query(
+      'SELECT id FROM inventory WHERE product_id = ANY($1::uuid[]) FOR UPDATE',
+      [productIds]
+    );
+
+    // Re-check stock with the locked rows (values may have changed since pre-check)
+    for (const r of resolved) {
+      const { rows: inv } = await client.query(
+        'SELECT COALESCE(quantity - reserved, 0) AS available FROM inventory WHERE product_id = $1',
+        [r.product.id]
+      );
+      const available = inv[0]?.available ?? 0;
+      if (available < r.quantity) {
+        throw new AppError(
+          `Insufficient stock for "${r.product.name}".`,
+          409,
+          'INSUFFICIENT_STOCK',
+          { product_id: r.product.id, available }
+        );
+      }
+    }
+
+    const subtotal = resolved.reduce((s, i) => s + parseFloat(i.product.price) * i.quantity, 0);
 
     let coupon = null;
     if (couponCode) {
@@ -79,15 +111,14 @@ const placeOrder = async ({ userId, addressId, couponCode, paymentMethod, items,
         throw new AppError('You have already used this coupon.', 422, 'COUPON_ALREADY_USED');
     }
 
-    const discount = applyDiscount(coupon, subtotal);
+    const discount    = applyDiscount(coupon, subtotal);
     const deliveryFee = subtotal - discount >= FREE_DELIVERY_MIN ? 0 : DELIVERY_FEE;
-    const total = parseFloat((subtotal - discount + deliveryFee).toFixed(2));
+    const total       = parseFloat((subtotal - discount + deliveryFee).toFixed(2));
 
     const { rows: addrRows } = await client.query(
       'SELECT * FROM addresses WHERE id = $1 AND user_id = $2', [addressId, userId]
     );
     if (!addrRows.length) throw new AppError('Address not found.', 404, 'NOT_FOUND');
-    const address = addrRows[0];
 
     const estimatedDelivery = new Date(Date.now() + 45 * 60 * 1000);
 
@@ -95,7 +126,7 @@ const placeOrder = async ({ userId, addressId, couponCode, paymentMethod, items,
       userId, addressId, couponId: coupon?.id || null,
       paymentMethod, subtotal, discountAmount: discount,
       deliveryFee, total, notes, estimatedDelivery,
-      addressSnapshot: address,
+      addressSnapshot: addrRows[0],
     });
 
     const orderItems = resolved.map((i) => ({
@@ -110,19 +141,19 @@ const placeOrder = async ({ userId, addressId, couponCode, paymentMethod, items,
 
     await OrderModel.insertItems(client, order.id, orderItems);
 
-    // Deduct inventory
+    // Deduct inventory and write audit trail
     for (const item of resolved) {
-      await InventoryModel.adjust(client, item.product_id, -item.quantity);
+      const updated = await InventoryModel.adjust(client, item.product.id, -item.quantity);
       await InventoryModel.logTransaction(client, {
-        productId: item.product_id,
-        txnType: 'sale',
+        productId:     item.product.id,
+        txnType:       'sale',
         quantityDelta: -item.quantity,
-        quantityAfter: item.product.available_quantity - item.quantity,
-        referenceId: order.id,
+        quantityAfter: updated?.quantity ?? 0,
+        referenceId:   order.id,
       });
       await client.query(
         'UPDATE products SET total_sold = total_sold + $1 WHERE id = $2',
-        [item.quantity, item.product_id]
+        [item.quantity, item.product.id]
       );
     }
 
@@ -131,6 +162,13 @@ const placeOrder = async ({ userId, addressId, couponCode, paymentMethod, items,
     await client.query(
       `UPDATE orders SET status = 'confirmed', payment_status = 'paid' WHERE id = $1`,
       [order.id]
+    );
+
+    // Clear the cart now that the order is placed
+    await client.query(
+      `DELETE FROM cart_items
+        WHERE cart_id = (SELECT id FROM carts WHERE user_id = $1)`,
+      [userId]
     );
 
     return { ...order, status: 'confirmed', payment_status: 'paid',
@@ -147,7 +185,31 @@ const cancel = async (orderId, userId, reason, isAdmin) => {
   if (!cancellable.includes(order.status))
     throw new AppError('Order cannot be cancelled at this stage.', 409, 'ORDER_NOT_CANCELLABLE');
 
-  return OrderModel.updateStatus(orderId, 'cancelled', { reason });
+  return withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `UPDATE orders
+          SET status = 'cancelled', cancelled_at = NOW(), cancellation_reason = $2
+        WHERE id = $1
+       RETURNING id, order_number, status`,
+      [orderId, reason || null]
+    );
+
+    // Restore inventory for each item in the cancelled order
+    const items = (order.items || []).filter((i) => i && i.product_id);
+    for (const item of items) {
+      const updated = await InventoryModel.adjust(client, item.product_id, item.quantity);
+      await InventoryModel.logTransaction(client, {
+        productId:     item.product_id,
+        txnType:       'return',
+        quantityDelta: item.quantity,
+        quantityAfter: updated?.quantity ?? 0,
+        referenceId:   orderId,
+        notes:         `Order ${order.order_number} cancelled`,
+      });
+    }
+
+    return rows[0];
+  });
 };
 
 module.exports = { estimate, placeOrder, cancel };

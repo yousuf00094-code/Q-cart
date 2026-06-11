@@ -5,12 +5,24 @@ const list = async (req, res, next) => {
   try {
     const includeInactive = req.user?.role === 'admin' && req.query.include_inactive === 'true';
     const categories = await CategoryModel.listRoots(includeInactive);
-    const withChildren = await Promise.all(
-      categories.map(async (c) => ({
-        ...c,
-        children: await CategoryModel.listChildren(c.id),
-      }))
-    );
+
+    if (!categories.length) return res.json({ data: [] });
+
+    // Fetch all children for all root categories in one query instead of N queries
+    const parentIds = categories.map((c) => c.id);
+    const allChildren = await CategoryModel.listChildrenBatch(parentIds);
+
+    const childrenByParent = {};
+    for (const child of allChildren) {
+      if (!childrenByParent[child.parent_id]) childrenByParent[child.parent_id] = [];
+      childrenByParent[child.parent_id].push(child);
+    }
+
+    const withChildren = categories.map((c) => ({
+      ...c,
+      children: childrenByParent[c.id] || [],
+    }));
+
     res.json({ data: withChildren });
   } catch (err) { next(err); }
 };

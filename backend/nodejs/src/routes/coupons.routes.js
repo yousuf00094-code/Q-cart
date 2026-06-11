@@ -2,11 +2,12 @@ const { Router } = require('express');
 const { body, param } = require('express-validator');
 const ctrl = require('../controllers/coupons.controller');
 const { authenticate, authorize, optionalAuth } = require('../middleware/auth');
+const { couponLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
 
 const router = Router();
 
-router.post('/validate', optionalAuth,
+router.post('/validate', couponLimiter, optionalAuth,
   body('code').notEmpty(),
   body('order_amount').isFloat({ min: 0 }),
   validate, ctrl.validate

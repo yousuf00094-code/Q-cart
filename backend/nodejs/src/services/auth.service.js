@@ -28,6 +28,9 @@ const login = async ({ email, password }) => {
   const user = await UserModel.findByEmail(email);
   if (!user) throw new AppError('Invalid email or password.', 401, 'INVALID_CREDENTIALS');
   if (!user.is_active) throw new AppError('Account is suspended. Please contact support.', 403, 'ACCOUNT_SUSPENDED');
+  if (!user.is_email_verified) {
+    throw new AppError('Please verify your email address before logging in.', 403, 'EMAIL_NOT_VERIFIED');
+  }
 
   const valid = await verify(password, user.password_hash);
   if (!valid) throw new AppError('Invalid email or password.', 401, 'INVALID_CREDENTIALS');
@@ -72,7 +75,7 @@ const logout = async (userId) => {
 
 const forgotPassword = async (email) => {
   const user = await UserModel.findByEmail(email);
-  if (!user) return; // Silently ignore to prevent enumeration
+  if (!user) return; // Silently ignore to prevent email enumeration
 
   const token = crypto.randomBytes(32).toString('hex');
   const expires = new Date(Date.now() + parseInt(process.env.RESET_TOKEN_EXPIRY_MS || '3600000', 10));
@@ -83,8 +86,13 @@ const forgotPassword = async (email) => {
     [tokenHash, expires, user.id]
   );
 
-  // In production: send email with token. Returned here for testing.
-  return { token, email: user.email };
+  // TODO: integrate email service (AWS SES / SendGrid) — send reset link here.
+  // Never return the raw token in production responses.
+  if (process.env.NODE_ENV !== 'production') {
+    // Convenience for local development and test suites only
+    return { token, email: user.email };
+  }
+  return null;
 };
 
 const resetPassword = async (token, newPassword) => {

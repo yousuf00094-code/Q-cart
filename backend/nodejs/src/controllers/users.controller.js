@@ -20,10 +20,11 @@ const updateMe = async (req, res, next) => {
 
 const changePassword = async (req, res, next) => {
   try {
-    const user = await require('../config/database').query(
+    const { rows } = await require('../config/database').query(
       'SELECT password_hash FROM users WHERE id = $1', [req.user.id]
     );
-    const valid = await verify(req.body.current_password, user.rows[0].password_hash);
+    if (!rows.length) throw new AppError('User not found.', 404, 'NOT_FOUND');
+    const valid = await verify(req.body.current_password, rows[0].password_hash);
     if (!valid) throw new AppError('Current password is incorrect.', 400, 'WRONG_PASSWORD');
     const password_hash = await hash(req.body.new_password);
     await UserModel.updatePassword(req.user.id, password_hash);

@@ -77,4 +77,21 @@ const remove = async (id) => {
   return rowCount > 0;
 };
 
-module.exports = { findById, findBySlug, listRoots, listChildren, create, update, remove };
+// Fetch children for multiple parents in a single query — used by the
+// categories list endpoint to eliminate the N+1 query pattern.
+const listChildrenBatch = async (parentIds) => {
+  if (!parentIds.length) return [];
+  const { rows } = await query(
+    `SELECT c.*,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = TRUE) AS product_count
+       FROM categories c
+       LEFT JOIN products p ON p.category_id = c.id
+      WHERE c.parent_id = ANY($1::uuid[])
+     GROUP BY c.id
+     ORDER BY c.sort_order, c.name`,
+    [parentIds]
+  );
+  return rows;
+};
+
+module.exports = { findById, findBySlug, listRoots, listChildren, listChildrenBatch, create, update, remove };
