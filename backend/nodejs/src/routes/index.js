@@ -16,6 +16,7 @@ router.use('/reviews',    require('./reviews.routes'));
 router.use('/wishlist',   require('./wishlist.routes'));
 router.use('/coupons',    require('./coupons.routes'));
 router.use('/admin',      require('./admin.routes'));
+router.use('/payment',    require('./payment.routes'));
 
 // ── Supplier-scoped APIs ───────────────────────────────────────────────────
 router.use('/supplier/analytics', require('./supplier_analytics.routes'));

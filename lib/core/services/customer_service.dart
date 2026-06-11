@@ -58,6 +58,11 @@ class CustomerService {
     return res['data'] as Map<String, dynamic>;
   }
 
+  static Future<Map<String, dynamic>> updateAddress(String id, Map<String, dynamic> data) async {
+    final res = await ApiClient.put('/addresses/$id', data);
+    return res['data'] as Map<String, dynamic>;
+  }
+
   static Future<void> deleteAddress(String id) async {
     await ApiClient.delete('/addresses/$id');
   }
@@ -93,6 +98,29 @@ class CustomerService {
 
   static Future<void> cancelOrder(String id) async {
     await ApiClient.post('/orders/$id/cancel', {});
+  }
+
+  // ── Payment ───────────────────────────────────────────────────────────────
+
+  static Future<Map<String, dynamic>> initiatePayment({
+    required String addressId,
+    String? couponCode,
+  }) async {
+    final body = <String, dynamic>{
+      'address_id': addressId,
+      if (couponCode != null && couponCode.isNotEmpty) 'coupon_code': couponCode,
+    };
+    final res = await ApiClient.post('/payment/initiate', body);
+    return res['data'] as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> verifyPayment(String invoiceId) async {
+    final res = await ApiClient.post('/payment/verify', {'invoice_id': invoiceId});
+    return res['data'] as Map<String, dynamic>;
+  }
+
+  static Future<void> saveFcmToken(String token) async {
+    await ApiClient.patch('/payment/fcm-token', {'token': token});
   }
 
   // ── User Profile ──────────────────────────────────────────────────────────

@@ -147,6 +147,37 @@ class AppStrings {
     'agree_terms':      {'en': 'I agree to the Terms & Privacy Policy', 'ar': 'أوافق على الشروط وسياسة الخصوصية'},
     'or_continue_with': {'en': 'or continue with',    'ar': 'أو المتابعة عبر'},
 
+    // Addresses
+    'add_address':        {'en': 'Add Address',          'ar': 'إضافة عنوان'},
+    'edit_address':       {'en': 'Edit Address',         'ar': 'تعديل العنوان'},
+    'delete_address':     {'en': 'Delete Address',       'ar': 'حذف العنوان'},
+    'delete_address_confirm': {'en': 'Are you sure you want to delete this address?', 'ar': 'هل أنت متأكد من حذف هذا العنوان؟'},
+    'add_address_hint':   {'en': 'Add your delivery addresses here', 'ar': 'أضف عناوين التسليم هنا'},
+    'set_default':        {'en': 'Set Default',          'ar': 'تعيين كافتراضي'},
+    'set_as_default':     {'en': 'Set as default',       'ar': 'تعيين كافتراضي'},
+    'default':            {'en': 'Default',              'ar': 'افتراضي'},
+    'first_name':         {'en': 'First Name',           'ar': 'الاسم الأول'},
+    'last_name':          {'en': 'Last Name',            'ar': 'الاسم الأخير'},
+    'address_line1':      {'en': 'Address Line 1',       'ar': 'العنوان (السطر الأول)'},
+    'address_line2':      {'en': 'Address Line 2 (optional)', 'ar': 'العنوان (السطر الثاني)'},
+    'city':               {'en': 'City',                 'ar': 'المدينة'},
+    'state':              {'en': 'State / Region',       'ar': 'المنطقة'},
+
+    // Payment
+    'payment':            {'en': 'Payment',              'ar': 'الدفع'},
+    'pay_with_qpay':      {'en': 'Pay with QPay',        'ar': 'الدفع عبر كيو باي'},
+    'scan_qr_code':       {'en': 'Scan QR Code',         'ar': 'مسح رمز QR'},
+    'open_payment_page':  {'en': 'Open Payment Page',    'ar': 'فتح صفحة الدفع'},
+    'payment_pending':    {'en': 'Waiting for payment...','ar': 'في انتظار الدفع...'},
+    'payment_completed':  {'en': "I've Completed Payment",'ar': 'لقد أكملت الدفع'},
+    'payment_success':    {'en': 'Payment Successful',   'ar': 'تم الدفع بنجاح'},
+    'payment_failed':     {'en': 'Payment Failed',       'ar': 'فشل الدفع'},
+    'payment_success_msg':{'en': 'Your payment was processed successfully and your order has been placed.', 'ar': 'تمت معالجة دفعتك بنجاح وتم تقديم طلبك.'},
+    'payment_failed_msg': {'en': 'Your payment could not be processed. Please try again.', 'ar': 'تعذر معالجة دفعتك. يرجى المحاولة مرة أخرى.'},
+    'try_again':          {'en': 'Try Again',            'ar': 'حاول مرة أخرى'},
+    'initiating_payment': {'en': 'Initiating payment...','ar': 'جاري بدء الدفع...'},
+    'verifying_payment':  {'en': 'Verifying payment...', 'ar': 'جاري التحقق من الدفع...'},
+
     // General
     'retry':          {'en': 'Retry',          'ar': 'إعادة المحاولة'},
     'loading':        {'en': 'Loading...',     'ar': 'جاري التحميل...'},

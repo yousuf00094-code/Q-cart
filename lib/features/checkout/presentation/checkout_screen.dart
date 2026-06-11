@@ -161,6 +161,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
       return;
     }
+
+    if (_paymentMethod == 'qpay') {
+      Navigator.pushNamed(
+        context,
+        '/payment',
+        arguments: {
+          'address_id': _selectedAddressId!,
+          'coupon_code': _couponCode,
+          'total': _total,
+        },
+      );
+      return;
+    }
+
     setState(() => _placingOrder = true);
     try {
       final order = await CustomerService.placeOrder(
@@ -398,39 +412,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           subtitle: 'Pay when your order arrives',
         ),
         const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.background,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.divider),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.credit_card_outlined, color: AppColors.textSecondary),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      LocaleService.t('credit_card'),
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w500,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text(
-                      'Card payment handled at delivery',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+        _paymentOption(
+          value: 'qpay',
+          icon: Icons.qr_code_scanner,
+          title: LocaleService.t('pay_with_qpay'),
+          subtitle: 'Secure card / wallet payment via QPay',
         ),
       ],
     );
@@ -643,7 +629,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
                   : Text(
-                      LocaleService.t('place_order'),
+                      _paymentMethod == 'qpay'
+                          ? LocaleService.t('pay_with_qpay')
+                          : LocaleService.t('place_order'),
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
             ),

@@ -30,6 +30,15 @@ class ApiClient {
     return _handle(response);
   }
 
+  static Future<Map<String, dynamic>> put(String path, Map<String, dynamic> body) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl$path'),
+      headers: _headers,
+      body: json.encode(body),
+    );
+    return _handle(response);
+  }
+
   static Future<Map<String, dynamic>> patch(String path, Map<String, dynamic> body) async {
     final response = await http.patch(
       Uri.parse('$baseUrl$path'),
