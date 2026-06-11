@@ -7,18 +7,18 @@ const logger = require('./utils/logger');
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
 const start = async () => {
-  // Verify DB connectivity before accepting traffic
+  // Bind to port immediately so health checks pass while DB/migrations start
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    logger.info(`Q Cart API listening on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
+  });
+
+  // Verify DB connectivity after listen — non-fatal so the process stays up
   try {
     await pool.query('SELECT 1');
     logger.info('PostgreSQL connection established');
   } catch (err) {
-    logger.error('Failed to connect to PostgreSQL', { error: err.message });
-    process.exit(1);
+    logger.error('PostgreSQL not ready at startup — will retry on first request', { error: err.message });
   }
-
-  const server = app.listen(PORT, '0.0.0.0', () => {
-    logger.info(`Q Cart API listening on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
-  });
 
   // Graceful shutdown
   const shutdown = async (signal) => {
