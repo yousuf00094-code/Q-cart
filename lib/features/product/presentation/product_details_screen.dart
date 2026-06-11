@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
-  const ProductDetailsScreen({super.key, this.categoryName});
+  const ProductDetailsScreen({super.key, this.productId, this.categoryName});
 
+  final String? productId;
   final String? categoryName;
 
   @override

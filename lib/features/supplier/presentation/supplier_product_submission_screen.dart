@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/services/supplier_service.dart';
+import '../../../core/services/api_client.dart';
 
 class SupplierProductSubmissionScreen extends StatefulWidget {
   const SupplierProductSubmissionScreen({super.key});
@@ -14,14 +17,14 @@ class _SupplierProductSubmissionScreenState
     with SingleTickerProviderStateMixin {
   late TabController _tabCtrl;
   final _formKey = GlobalKey<FormState>();
-  bool _loading = false;
+  bool _submitting = false;
+  String? _submitError;
 
   // Basic Info
   final _nameCtrl = TextEditingController();
   final _skuCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-  String _selectedCategory = 'Electronics';
-  String _selectedBrand = '';
+  String _selectedCategoryId = '';
 
   // Pricing
   final _priceCtrl = TextEditingController();
@@ -39,17 +42,18 @@ class _SupplierProductSubmissionScreenState
   final _widthCtrl = TextEditingController();
   final _heightCtrl = TextEditingController();
 
-  final _categories = [
-    'Electronics', 'Clothing', 'Home & Garden', 'Sports', 'Books',
-    'Beauty', 'Toys', 'Automotive', 'Food & Grocery',
-  ];
+  // Categories loaded from API
+  List<Map<String, dynamic>> _categories = [];
+  bool _catLoading = true;
 
-  final List<String> _mockImages = ['img1', 'img2', 'img3'];
+  final List<String> _imageUrls = [];
+  bool _uploadingImage = false;
 
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 4, vsync: this);
+    _loadCategories();
   }
 
   @override
@@ -63,13 +67,63 @@ class _SupplierProductSubmissionScreenState
     super.dispose();
   }
 
+  Future<void> _loadCategories() async {
+    try {
+      final cats = await SupplierService.getCategories();
+      if (!mounted) return;
+      setState(() {
+        _categories = cats;
+        _catLoading = false;
+        if (cats.isNotEmpty) {
+          _selectedCategoryId = cats[0]['id']?.toString() ?? '';
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _catLoading = false);
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _loading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() => _loading = false);
-    _showSuccessSheet();
+    if (_selectedCategoryId.isEmpty) {
+      setState(() => _submitError = 'Please select a category.');
+      return;
+    }
+    setState(() { _submitting = true; _submitError = null; });
+
+    try {
+      final data = <String, dynamic>{
+        'name': _nameCtrl.text.trim(),
+        'category_id': _selectedCategoryId,
+        'price': double.parse(_priceCtrl.text.trim()),
+        'description': _descCtrl.text.trim(),
+        if (_skuCtrl.text.trim().isNotEmpty) 'sku': _skuCtrl.text.trim(),
+        if (_comparePriceCtrl.text.trim().isNotEmpty)
+          'compare_at_price': double.tryParse(_comparePriceCtrl.text.trim()),
+        if (_costCtrl.text.trim().isNotEmpty)
+          'cost_price': double.tryParse(_costCtrl.text.trim()),
+        if (_trackInventory && _stockCtrl.text.trim().isNotEmpty)
+          'stock_quantity': int.tryParse(_stockCtrl.text.trim()) ?? 0,
+        if (_trackInventory && _reorderCtrl.text.trim().isNotEmpty)
+          'reorder_point': int.tryParse(_reorderCtrl.text.trim()),
+        if (_weightCtrl.text.trim().isNotEmpty)
+          'weight_grams': ((double.tryParse(_weightCtrl.text.trim()) ?? 0) * 1000).round(),
+        if (_imageUrls.isNotEmpty) 'images': _imageUrls,
+        'is_active': false,
+      };
+
+      await SupplierService.submitProduct(data);
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      _showSuccessSheet();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() { _submitting = false; _submitError = e.message; });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _submitting = false; _submitError = 'Failed to submit. Please try again.'; });
+    }
   }
 
   @override
@@ -108,13 +162,27 @@ class _SupplierProductSubmissionScreenState
       ),
       body: Form(
         key: _formKey,
-        child: TabBarView(
-          controller: _tabCtrl,
+        child: Column(
           children: [
-            _buildBasicInfoTab(),
-            _buildPricingTab(),
-            _buildInventoryTab(),
-            _buildShippingTab(),
+            if (_submitError != null)
+              Container(
+                width: double.infinity,
+                color: Colors.red.withOpacity(0.1),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Text(_submitError!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ),
+            Expanded(
+              child: TabBarView(
+                controller: _tabCtrl,
+                children: [
+                  _buildBasicInfoTab(),
+                  _buildPricingTab(),
+                  _buildInventoryTab(),
+                  _buildShippingTab(),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -146,16 +214,25 @@ class _SupplierProductSubmissionScreenState
                   prefixIcon: Icon(Icons.qr_code_outlined)),
             ),
             const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
-              value: _selectedCategory,
-              decoration: const InputDecoration(
-                  labelText: 'Category *',
-                  prefixIcon: Icon(Icons.category_outlined)),
-              items: _categories
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                  .toList(),
-              onChanged: (v) => setState(() => _selectedCategory = v!),
-            ),
+            _catLoading
+                ? const Center(child: CircularProgressIndicator())
+                : DropdownButtonFormField<String>(
+                    value: _selectedCategoryId.isEmpty ? null : _selectedCategoryId,
+                    decoration: const InputDecoration(
+                        labelText: 'Category *',
+                        prefixIcon: Icon(Icons.category_outlined)),
+                    items: _categories
+                        .map((c) => DropdownMenuItem(
+                              value: c['id']?.toString() ?? '',
+                              child: Text(c['name']?.toString() ?? ''),
+                            ))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) setState(() => _selectedCategoryId = v);
+                    },
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
+                  ),
             const SizedBox(height: 14),
             TextFormField(
               decoration: const InputDecoration(
@@ -182,6 +259,27 @@ class _SupplierProductSubmissionScreenState
     );
   }
 
+  Future<void> _pickAndUploadImage() async {
+    if (_imageUrls.length >= 8) return;
+    final picker = ImagePicker();
+    final XFile? file = await picker.pickImage(
+        source: ImageSource.gallery, imageQuality: 85, maxWidth: 1200);
+    if (file == null) return;
+    setState(() => _uploadingImage = true);
+    try {
+      final url = await SupplierService.uploadImage(file.path);
+      if (!mounted) return;
+      setState(() => _imageUrls.add(url));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Image upload failed. Please try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _uploadingImage = false);
+    }
+  }
+
   Widget _buildImageUploadSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -200,8 +298,8 @@ class _SupplierProductSubmissionScreenState
           child: ListView(
             scrollDirection: Axis.horizontal,
             children: [
-              ..._mockImages.map((img) => _buildImageThumbnail(img)),
-              _buildAddImageTile(),
+              ..._imageUrls.asMap().entries.map((e) => _buildImageThumbnail(e.value, e.key)),
+              if (_imageUrls.length < 8) _buildAddImageTile(),
             ],
           ),
         ),
@@ -209,7 +307,7 @@ class _SupplierProductSubmissionScreenState
     );
   }
 
-  Widget _buildImageThumbnail(String img) {
+  Widget _buildImageThumbnail(String url, int index) {
     return Container(
       width: 88,
       height: 88,
@@ -220,13 +318,19 @@ class _SupplierProductSubmissionScreenState
         border: Border.all(color: AppColors.primary.withOpacity(0.4)),
       ),
       child: Stack(
+        fit: StackFit.expand,
         children: [
-          const Center(child: Icon(Icons.image_outlined, color: AppColors.primary, size: 32)),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.network(url, fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    const Icon(Icons.broken_image_outlined, color: AppColors.primary, size: 32)),
+          ),
           Positioned(
             top: 4,
             right: 4,
             child: GestureDetector(
-              onTap: () => setState(() => _mockImages.remove(img)),
+              onTap: () => setState(() => _imageUrls.removeAt(index)),
               child: Container(
                 width: 20,
                 height: 20,
@@ -236,6 +340,25 @@ class _SupplierProductSubmissionScreenState
               ),
             ),
           ),
+          if (index == 0)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withOpacity(0.8),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(10),
+                    bottomRight: Radius.circular(10),
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: const Text('Cover',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w600)),
+              ),
+            ),
         ],
       ),
     );
@@ -243,7 +366,7 @@ class _SupplierProductSubmissionScreenState
 
   Widget _buildAddImageTile() {
     return GestureDetector(
-      onTap: () {},
+      onTap: _uploadingImage ? null : _pickAndUploadImage,
       child: Container(
         width: 88,
         height: 88,
@@ -253,17 +376,22 @@ class _SupplierProductSubmissionScreenState
           border: Border.all(
               color: AppColors.divider, style: BorderStyle.solid, width: 1.5),
         ),
-        child: const Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.add_photo_alternate_outlined,
-                color: AppColors.textSecondary, size: 28),
-            SizedBox(height: 4),
-            Text('Add',
-                style:
-                    TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-          ],
-        ),
+        child: _uploadingImage
+            ? const Center(
+                child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2)))
+            : const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_photo_alternate_outlined,
+                      color: AppColors.textSecondary, size: 28),
+                  SizedBox(height: 4),
+                  Text('Add',
+                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                ],
+              ),
       ),
     );
   }
@@ -357,6 +485,10 @@ class _SupplierProductSubmissionScreenState
   }
 
   Widget _buildMarginCard() {
+    final price = double.tryParse(_priceCtrl.text) ?? 0;
+    final commission = price * 0.10;
+    final vat = price * 0.05;
+    final payout = price - commission - vat;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -372,10 +504,10 @@ class _SupplierProductSubmissionScreenState
                   fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
           const SizedBox(height: 12),
           ...[
-            ('Selling Price', 'QAR 149.00'),
-            ('Q Cart Commission (10%)', '- QAR 14.90'),
-            ('VAT (5%)', '- QAR 7.45'),
-            ('Your Estimated Payout', 'QAR 126.65'),
+            ('Selling Price', 'QAR ${price.toStringAsFixed(2)}'),
+            ('Q Cart Commission (10%)', '- QAR ${commission.toStringAsFixed(2)}'),
+            ('VAT (5%)', '- QAR ${vat.toStringAsFixed(2)}'),
+            ('Your Estimated Payout', 'QAR ${payout.toStringAsFixed(2)}'),
           ].map(
             (r) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
@@ -611,7 +743,7 @@ class _SupplierProductSubmissionScreenState
           Expanded(
             flex: 2,
             child: ElevatedButton(
-              onPressed: _loading
+              onPressed: _submitting
                   ? null
                   : () {
                       if (_tabCtrl.index < 3) {
@@ -626,7 +758,7 @@ class _SupplierProductSubmissionScreenState
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
-              child: _loading
+              child: _submitting
                   ? const SizedBox(
                       width: 20,
                       height: 20,

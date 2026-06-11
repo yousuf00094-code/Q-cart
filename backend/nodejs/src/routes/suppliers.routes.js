@@ -6,6 +6,14 @@ const validate = require('../middleware/validate');
 
 const router = Router();
 
+// Public — no authentication required
+router.post('/apply',
+  body('business_name').notEmpty().withMessage('Business name is required'),
+  body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
+  body('phone').optional().isMobilePhone().withMessage('Invalid phone number'),
+  validate, ctrl.apply
+);
+
 router.get('/', ctrl.list);
 router.get('/:id', param('id').isUUID(), validate, ctrl.getOne);
 

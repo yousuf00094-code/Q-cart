@@ -1,358 +1,399 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/services/locale_service.dart';
+import '../../../core/services/customer_service.dart';
+import '../../../core/services/cart_service.dart';
+import '../../../core/services/api_client.dart';
 
 class CheckoutScreen extends StatefulWidget {
-  const CheckoutScreen({super.key});
+  final String? couponCode;
+  final Map<String, dynamic>? couponData;
+
+  const CheckoutScreen({super.key, this.couponCode, this.couponData});
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  int _selectedAddress = 0;
-  int _selectedPayment = 0;
-  bool _isPlacing = false;
+  bool _loadingAddresses = true;
+  bool _loadingCart = true;
+  bool _placingOrder = false;
 
-  static const List<_Address> _addresses = [
-    _Address(
-      label: 'Home',
-      name: 'Yousuf Al-Rashid',
-      line1: 'Villa 14, Street 22, Al Waab',
-      city: 'Doha, Qatar',
-      phone: '+974 5512 3456',
-      icon: Icons.home_outlined,
-    ),
-    _Address(
-      label: 'Work',
-      name: 'Yousuf Al-Rashid',
-      line1: 'Office 4B, West Bay Tower',
-      city: 'Doha, Qatar',
-      phone: '+974 5512 3456',
-      icon: Icons.business_outlined,
-    ),
-  ];
+  List<Map<String, dynamic>> _addresses = [];
+  Map<String, dynamic>? _cartData;
+  String? _selectedAddressId;
+  String _paymentMethod = 'cash_on_delivery';
+  String? _couponCode;
+  Map<String, dynamic>? _couponData;
 
-  static const List<_PaymentMethod> _payments = [
-    _PaymentMethod(
-      label: 'Visa ending in 4242',
-      icon: Icons.credit_card,
-      detail: 'Expires 08/27',
-      type: _PaymentType.card,
-    ),
-    _PaymentMethod(
-      label: 'Cash on Delivery',
-      icon: Icons.payments_outlined,
-      detail: 'Pay when you receive',
-      type: _PaymentType.cash,
-    ),
-    _PaymentMethod(
-      label: 'Apple Pay',
-      icon: Icons.apple,
-      detail: 'Touch ID / Face ID',
-      type: _PaymentType.digital,
-    ),
-  ];
+  final _firstNameCtrl = TextEditingController();
+  final _lastNameCtrl = TextEditingController();
+  final _line1Ctrl = TextEditingController();
+  final _line2Ctrl = TextEditingController();
+  final _cityCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _addressFormKey = GlobalKey<FormState>();
 
-  static const List<_OrderLine> _lines = [
-    _OrderLine(name: 'Organic Dates 500g', qty: 2, price: 35.0),
-    _OrderLine(name: 'Saffron Pack 5g', qty: 1, price: 120.0),
-    _OrderLine(name: 'Camel Milk 1L', qty: 3, price: 28.0),
-  ];
-
-  double get _subtotal =>
-      _lines.fold(0, (s, l) => s + l.price * l.qty);
-  double get _delivery => 15.0;
-  double get _discount => _subtotal * 0.05;
-  double get _total => _subtotal + _delivery - _discount;
-
-  void _placeOrder() async {
-    setState(() => _isPlacing = true);
-    await Future.delayed(const Duration(seconds: 1));
-    if (!mounted) return;
-    setState(() => _isPlacing = false);
-    _showConfirmation();
+  @override
+  void initState() {
+    super.initState();
+    _couponCode = widget.couponCode;
+    _couponData = widget.couponData;
+    _loadData();
   }
 
-  void _showConfirmation() {
-    showModalBottomSheet(
+  @override
+  void dispose() {
+    _firstNameCtrl.dispose();
+    _lastNameCtrl.dispose();
+    _line1Ctrl.dispose();
+    _line2Ctrl.dispose();
+    _cityCtrl.dispose();
+    _phoneCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    await Future.wait([_loadAddresses(), _loadCart()]);
+  }
+
+  Future<void> _loadAddresses() async {
+    setState(() => _loadingAddresses = true);
+    try {
+      final addresses = await CustomerService.getAddresses();
+      if (!mounted) return;
+      setState(() {
+        _addresses = addresses;
+        Map<String, dynamic>? defaultAddr;
+        for (final a in addresses) {
+          if (a['is_default'] == true) {
+            defaultAddr = a;
+            break;
+          }
+        }
+        defaultAddr ??= addresses.isNotEmpty ? addresses.first : null;
+        if (defaultAddr != null) {
+          _selectedAddressId = defaultAddr['id']?.toString();
+        }
+        _loadingAddresses = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingAddresses = false);
+    }
+  }
+
+  Future<void> _loadCart() async {
+    setState(() => _loadingCart = true);
+    try {
+      final res = await CartService.getCart();
+      if (!mounted) return;
+      setState(() {
+        _cartData = res['data'] as Map<String, dynamic>?;
+        _loadingCart = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingCart = false);
+    }
+  }
+
+  double get _subtotal {
+    if (_cartData == null) return 0;
+    final val = _cartData!['subtotal'];
+    if (val is num) return val.toDouble();
+    if (val is String) return double.tryParse(val) ?? 0;
+    return 0;
+  }
+
+  double get _delivery => _subtotal >= 200 ? 0 : 15;
+
+  double get _discountAmount {
+    if (_couponData == null) return 0;
+    final type = _couponData!['discount_type']?.toString();
+    final value = (_couponData!['discount_value'] as num?)?.toDouble() ?? 0;
+    if (type == 'percentage') return (_subtotal * value / 100);
+    return value;
+  }
+
+  double get _total => _subtotal + _delivery - _discountAmount;
+
+  List<Map<String, dynamic>> get _cartItems {
+    if (_cartData == null) return [];
+    final items = _cartData!['items'];
+    if (items is List) return items.cast<Map<String, dynamic>>();
+    return [];
+  }
+
+  Future<void> _showAddAddressSheet() async {
+    _firstNameCtrl.clear();
+    _lastNameCtrl.clear();
+    _line1Ctrl.clear();
+    _line2Ctrl.clear();
+    _cityCtrl.clear();
+    _phoneCtrl.clear();
+
+    await showModalBottomSheet(
       context: context,
-      isDismissible: false,
-      enableDrag: false,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
-        decoration: const BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.divider,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: const Icon(Icons.check_circle,
-                  size: 40, color: Color(0xFF388E3C)),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Order Placed!',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Your order #QC-20482 has been placed\nsuccessfully.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                  height: 1.5),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.divider),
-              ),
-              child: const Text(
-                'Estimated delivery: 30-45 minutes',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.secondary,
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.secondary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                  elevation: 0,
-                ),
-                child: const Text('Track My Order',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700)),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pop(context);
-              },
-              child: const Text(
-                'Continue Shopping',
-                style: TextStyle(
-                  color: AppColors.secondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
+      isScrollControlled: true,
+      backgroundColor: AppColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => _AddAddressSheet(
+        formKey: _addressFormKey,
+        firstNameCtrl: _firstNameCtrl,
+        lastNameCtrl: _lastNameCtrl,
+        line1Ctrl: _line1Ctrl,
+        line2Ctrl: _line2Ctrl,
+        cityCtrl: _cityCtrl,
+        phoneCtrl: _phoneCtrl,
+        onSaved: () async {
+          await _loadAddresses();
+        },
       ),
     );
+  }
+
+  Future<void> _placeOrder() async {
+    if (_selectedAddressId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a delivery address.')),
+      );
+      return;
+    }
+
+    if (_paymentMethod == 'qpay') {
+      Navigator.pushNamed(
+        context,
+        '/payment',
+        arguments: {
+          'address_id': _selectedAddressId!,
+          'coupon_code': _couponCode,
+          'total': _total,
+        },
+      );
+      return;
+    }
+
+    setState(() => _placingOrder = true);
+    try {
+      final order = await CustomerService.placeOrder(
+        addressId: _selectedAddressId!,
+        paymentMethod: _paymentMethod,
+        couponCode: _couponCode,
+      );
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/order-confirmation', arguments: order);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _placingOrder = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e is ApiException ? e.message : LocaleService.t('error_generic')),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.surface,
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Checkout',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
+        title: Text(
+          LocaleService.t('checkout'),
+          style: const TextStyle(
             color: AppColors.textPrimary,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
           ),
         ),
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildSectionTitle('Delivery Address'),
-            const SizedBox(height: 10),
-            ..._buildAddressList(),
-            _buildAddNewAddress(),
-            const SizedBox(height: 24),
-            _buildSectionTitle('Payment Method'),
-            const SizedBox(height: 10),
-            ..._buildPaymentList(),
-            const SizedBox(height: 24),
-            _buildSectionTitle('Order Summary'),
-            const SizedBox(height: 10),
+            _sectionHeader(LocaleService.t('delivery_address')),
+            const SizedBox(height: 12),
+            _buildAddressSection(),
+            const SizedBox(height: 20),
+            _sectionHeader(LocaleService.t('payment_method')),
+            const SizedBox(height: 12),
+            _buildPaymentSection(),
+            const SizedBox(height: 20),
+            _sectionHeader(LocaleService.t('order_summary')),
+            const SizedBox(height: 12),
             _buildOrderSummary(),
+            const SizedBox(height: 100),
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomBar(context),
+      bottomNavigationBar: _buildBottomBar(),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _sectionHeader(String title) {
     return Text(
       title,
       style: const TextStyle(
         fontSize: 16,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.bold,
         color: AppColors.textPrimary,
       ),
     );
   }
 
-  List<Widget> _buildAddressList() {
-    return List.generate(_addresses.length, (i) {
-      final addr = _addresses[i];
-      final selected = _selectedAddress == i;
-      return GestureDetector(
-        onTap: () => setState(() => _selectedAddress = i),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: selected
-                ? AppColors.secondary.withOpacity(0.05)
-                : AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: selected ? AppColors.secondary : AppColors.divider,
-              width: selected ? 1.5 : 1,
+  Widget _buildAddressSection() {
+    if (_loadingAddresses) {
+      return Column(
+        children: List.generate(
+          2,
+          (_) => Container(
+            height: 90,
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: AppColors.divider.withOpacity(0.4),
+              borderRadius: BorderRadius.circular(12),
             ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: selected
-                      ? AppColors.secondary
-                      : AppColors.primary.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(addr.icon,
-                    size: 20,
-                    color: selected ? Colors.white : AppColors.secondary),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          addr.label,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        if (i == 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'Default',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.secondary),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${addr.line1}, ${addr.city}',
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-              ),
-              Radio<int>(
-                value: i,
-                groupValue: _selectedAddress,
-                onChanged: (v) => setState(() => _selectedAddress = v!),
-                activeColor: AppColors.secondary,
-              ),
-            ],
           ),
         ),
       );
-    });
-  }
+    }
 
-  Widget _buildAddNewAddress() {
-    return GestureDetector(
-      onTap: () {},
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: AppColors.secondary.withOpacity(0.4),
-            style: BorderStyle.solid,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_addresses.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.location_off_outlined, color: AppColors.textSecondary, size: 36),
+                const SizedBox(height: 8),
+                Text(
+                  LocaleService.t('no_addresses'),
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          )
+        else
+          ..._addresses.map((addr) => _buildAddressCard(addr)),
+        OutlinedButton.icon(
+          onPressed: _showAddAddressSheet,
+          icon: const Icon(Icons.add, size: 18),
+          label: Text(LocaleService.t('add_new_address')),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.secondary,
+            side: const BorderSide(color: AppColors.secondary),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            padding: const EdgeInsets.symmetric(vertical: 12),
           ),
         ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+      ],
+    );
+  }
+
+  Widget _buildAddressCard(Map<String, dynamic> addr) {
+    final id = addr['id']?.toString();
+    final isSelected = _selectedAddressId == id;
+    final isDefault = addr['is_default'] == true;
+    final firstName = addr['first_name']?.toString() ?? '';
+    final lastName = addr['last_name']?.toString() ?? '';
+    final line1 = addr['address_line1']?.toString() ?? '';
+    final line2 = addr['address_line2']?.toString() ?? '';
+    final city = addr['city']?.toString() ?? '';
+    final label = addr['label']?.toString();
+
+    return GestureDetector(
+      onTap: () => setState(() => _selectedAddressId = id),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.secondary : AppColors.divider,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.add, size: 18, color: AppColors.secondary),
-            SizedBox(width: 6),
-            Text(
-              'Add New Address',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.secondary,
+            Radio<String?>(
+              value: id,
+              groupValue: _selectedAddressId,
+              onChanged: (v) => setState(() => _selectedAddressId = v),
+              activeColor: AppColors.secondary,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          label ?? '$firstName $lastName',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      if (isDefault) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            LocaleService.t('default_label'),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.secondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  if (label != null)
+                    Text(
+                      '$firstName $lastName',
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                    ),
+                  Text(line1, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                  if (line2.isNotEmpty)
+                    Text(line2, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                  Text(city, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                ],
               ),
             ),
           ],
@@ -361,303 +402,397 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  List<Widget> _buildPaymentList() {
-    return List.generate(_payments.length, (i) {
-      final method = _payments[i];
-      final selected = _selectedPayment == i;
-      return GestureDetector(
-        onTap: () => setState(() => _selectedPayment = i),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: selected
-                ? AppColors.secondary.withOpacity(0.05)
-                : AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: selected ? AppColors.secondary : AppColors.divider,
-              width: selected ? 1.5 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: selected
-                      ? AppColors.secondary
-                      : AppColors.primary.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(method.icon,
-                    size: 20,
-                    color: selected ? Colors.white : AppColors.secondary),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      method.label,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      method.detail,
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-              ),
-              Radio<int>(
-                value: i,
-                groupValue: _selectedPayment,
-                onChanged: (v) => setState(() => _selectedPayment = v!),
-                activeColor: AppColors.secondary,
-              ),
-            ],
-          ),
+  Widget _buildPaymentSection() {
+    return Column(
+      children: [
+        _paymentOption(
+          value: 'cash_on_delivery',
+          icon: Icons.payments_outlined,
+          title: LocaleService.t('cash_on_delivery'),
+          subtitle: 'Pay when your order arrives',
         ),
-      );
-    });
+        const SizedBox(height: 10),
+        _paymentOption(
+          value: 'qpay',
+          icon: Icons.qr_code_scanner,
+          title: LocaleService.t('pay_with_qpay'),
+          subtitle: 'Secure card / wallet payment via QPay',
+        ),
+      ],
+    );
   }
 
-  Widget _buildOrderSummary() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Column(
-        children: [
-          ..._lines.map(
-            (line) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
+  Widget _paymentOption({
+    required String value,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    final isSelected = _paymentMethod == value;
+    return GestureDetector(
+      onTap: () => setState(() => _paymentMethod = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.secondary : AppColors.divider,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Radio<String>(
+              value: value,
+              groupValue: _paymentMethod,
+              onChanged: (v) => setState(() => _paymentMethod = v!),
+              activeColor: AppColors.secondary,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            const SizedBox(width: 8),
+            Icon(icon, color: isSelected ? AppColors.secondary : AppColors.textSecondary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${line.qty}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.secondary,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      line.name,
-                      style: const TextStyle(
-                          fontSize: 13, color: AppColors.textPrimary),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: isSelected ? AppColors.secondary : AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
                     ),
                   ),
                   Text(
-                    'QAR ${(line.price * line.qty).toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
+                    subtitle,
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                   ),
                 ],
               ),
             ),
-          ),
-          const Divider(color: AppColors.divider, height: 16),
-          _SummaryRow(label: 'Subtotal', value: 'QAR ${_subtotal.toStringAsFixed(2)}'),
-          const SizedBox(height: 6),
-          _SummaryRow(
-            label: 'Delivery',
-            value: 'QAR ${_delivery.toStringAsFixed(2)}',
-          ),
-          const SizedBox(height: 6),
-          _SummaryRow(
-            label: 'Discount (5%)',
-            value: '- QAR ${_discount.toStringAsFixed(2)}',
-            valueColor: const Color(0xFF2ECC71),
-          ),
-          const Divider(color: AppColors.divider, height: 16),
-          _SummaryRow(
-            label: 'Total',
-            value: 'QAR ${_total.toStringAsFixed(2)}',
-            isBold: true,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomBar(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: _isPlacing ? null : _placeOrder,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.secondary,
-            foregroundColor: Colors.white,
-            disabledBackgroundColor: AppColors.secondary.withOpacity(0.6),
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14)),
-            elevation: 0,
-          ),
-          child: _isPlacing
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'Place Order',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'QAR ${_total.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+          ],
         ),
       ),
     );
   }
-}
 
-class _SummaryRow extends StatelessWidget {
-  const _SummaryRow({
-    required this.label,
-    required this.value,
-    this.valueColor,
-    this.isBold = false,
-  });
+  Widget _buildOrderSummary() {
+    if (_loadingCart) {
+      return Container(
+        height: 160,
+        decoration: BoxDecoration(
+          color: AppColors.divider.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(12),
+        ),
+      );
+    }
 
-  final String label;
-  final String value;
-  final Color? valueColor;
-  final bool isBold;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ..._cartItems.map((item) {
+            final product = item['product'] as Map<String, dynamic>?;
+            final name = product?['name']?.toString() ?? 'Product';
+            final price = (product?['price'] as num?)?.toDouble() ?? 0;
+            final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '$name x$qty',
+                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                    ),
+                  ),
+                  Text(
+                    'QAR ${(price * qty).toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          if (_cartItems.isNotEmpty) const Divider(color: AppColors.divider),
+          _summaryRow(LocaleService.t('subtotal'), 'QAR ${_subtotal.toStringAsFixed(2)}'),
+          const SizedBox(height: 6),
+          _summaryRow(
+            LocaleService.t('delivery'),
+            _delivery == 0 ? LocaleService.t('free') : 'QAR ${_delivery.toStringAsFixed(2)}',
+          ),
+          if (_discountAmount > 0) ...[
+            const SizedBox(height: 6),
+            _summaryRow(
+              LocaleService.t('discount'),
+              '- QAR ${_discountAmount.toStringAsFixed(2)}',
+              valueColor: Colors.green.shade600,
+            ),
+          ],
+          const Divider(color: AppColors.divider),
+          _summaryRow(
+            LocaleService.t('total'),
+            'QAR ${_total.toStringAsFixed(2)}',
+            isBold: true,
+            valueColor: AppColors.secondary,
+          ),
+        ],
+      ),
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _summaryRow(
+    String label,
+    String value, {
+    bool isBold = false,
+    Color? valueColor,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
           style: TextStyle(
-            fontSize: isBold ? 15 : 13,
-            fontWeight: isBold ? FontWeight.w700 : FontWeight.w400,
-            color: isBold ? AppColors.textPrimary : AppColors.textSecondary,
+            color: AppColors.textSecondary,
+            fontSize: 14,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
           ),
         ),
         Text(
           value,
           style: TextStyle(
-            fontSize: isBold ? 17 : 13,
-            fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
-            color: valueColor ??
-                (isBold ? AppColors.secondary : AppColors.textPrimary),
+            color: valueColor ?? AppColors.textPrimary,
+            fontSize: 14,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
           ),
         ),
       ],
     );
   }
+
+  Widget _buildBottomBar() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      decoration: const BoxDecoration(
+        color: AppColors.background,
+        border: Border(top: BorderSide(color: AppColors.divider)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                LocaleService.t('total'),
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+              ),
+              Text(
+                'QAR ${_total.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  color: AppColors.secondary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _placingOrder ? null : _placeOrder,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.secondary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                disabledBackgroundColor: AppColors.secondary.withOpacity(0.6),
+              ),
+              child: _placingOrder
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(
+                      _paymentMethod == 'qpay'
+                          ? LocaleService.t('pay_with_qpay')
+                          : LocaleService.t('place_order'),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _Address {
-  final String label;
-  final String name;
-  final String line1;
-  final String city;
-  final String phone;
-  final IconData icon;
+class _AddAddressSheet extends StatefulWidget {
+  final GlobalKey<FormState> formKey;
+  final TextEditingController firstNameCtrl;
+  final TextEditingController lastNameCtrl;
+  final TextEditingController line1Ctrl;
+  final TextEditingController line2Ctrl;
+  final TextEditingController cityCtrl;
+  final TextEditingController phoneCtrl;
+  final Future<void> Function() onSaved;
 
-  const _Address({
-    required this.label,
-    required this.name,
-    required this.line1,
-    required this.city,
-    required this.phone,
-    required this.icon,
+  const _AddAddressSheet({
+    required this.formKey,
+    required this.firstNameCtrl,
+    required this.lastNameCtrl,
+    required this.line1Ctrl,
+    required this.line2Ctrl,
+    required this.cityCtrl,
+    required this.phoneCtrl,
+    required this.onSaved,
   });
+
+  @override
+  State<_AddAddressSheet> createState() => _AddAddressSheetState();
 }
 
-class _PaymentMethod {
-  final String label;
-  final IconData icon;
-  final String detail;
-  final _PaymentType type;
+class _AddAddressSheetState extends State<_AddAddressSheet> {
+  bool _saving = false;
 
-  const _PaymentMethod({
-    required this.label,
-    required this.icon,
-    required this.detail,
-    required this.type,
-  });
-}
+  Widget _field(
+    TextEditingController ctrl,
+    String label, {
+    bool required = false,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return TextFormField(
+      controller: ctrl,
+      keyboardType: keyboardType,
+      style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+        filled: true,
+        fillColor: AppColors.surface,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.divider),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.divider),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.secondary, width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      ),
+      validator: required
+          ? (v) => (v == null || v.trim().isEmpty) ? 'Required' : null
+          : null,
+    );
+  }
 
-enum _PaymentType { card, cash, digital }
+  Future<void> _submit() async {
+    if (!widget.formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    try {
+      await CustomerService.createAddress({
+        'first_name': widget.firstNameCtrl.text.trim(),
+        'last_name': widget.lastNameCtrl.text.trim(),
+        'address_line1': widget.line1Ctrl.text.trim(),
+        if (widget.line2Ctrl.text.trim().isNotEmpty)
+          'address_line2': widget.line2Ctrl.text.trim(),
+        'city': widget.cityCtrl.text.trim(),
+        if (widget.phoneCtrl.text.trim().isNotEmpty)
+          'phone': widget.phoneCtrl.text.trim(),
+      });
+      if (mounted) Navigator.pop(context);
+      await widget.onSaved();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              e is ApiException ? e.message : LocaleService.t('error_generic'),
+            ),
+          ),
+        );
+      }
+    }
+  }
 
-class _OrderLine {
-  final String name;
-  final int qty;
-  final double price;
-
-  const _OrderLine({
-    required this.name,
-    required this.qty,
-    required this.price,
-  });
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Form(
+          key: widget.formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                LocaleService.t('add_new_address'),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(child: _field(widget.firstNameCtrl, 'First Name', required: true)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _field(widget.lastNameCtrl, 'Last Name', required: true)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _field(widget.line1Ctrl, 'Address Line 1', required: true),
+              const SizedBox(height: 12),
+              _field(widget.line2Ctrl, 'Address Line 2 (optional)'),
+              const SizedBox(height: 12),
+              _field(widget.cityCtrl, 'City', required: true),
+              const SizedBox(height: 12),
+              _field(widget.phoneCtrl, LocaleService.t('phone'), keyboardType: TextInputType.phone),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _saving ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.secondary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _saving
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text(LocaleService.t('save')),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

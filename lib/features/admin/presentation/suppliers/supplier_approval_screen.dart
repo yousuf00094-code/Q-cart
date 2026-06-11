@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/admin_service.dart';
 
 class AdminSupplierApprovalScreen extends StatefulWidget {
   const AdminSupplierApprovalScreen({super.key});
@@ -16,68 +17,15 @@ class _AdminSupplierApprovalScreenState
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
 
-  final List<_SupplierApplication> _applications = [
-    _SupplierApplication(
-      'TechVision Qatar',
-      'Mohammed Al-Rashid',
-      'tech@techvisionqa.com',
-      '+974 5512 3456',
-      'Electronics',
-      'pending',
-      '8 Jun 2026',
-      '45678901',
-      false,
-    ),
-    _SupplierApplication(
-      'Doha Fashion House',
-      'Aisha Al-Mansoori',
-      'info@dohafashion.qa',
-      '+974 5578 9012',
-      'Clothing & Apparel',
-      'pending',
-      '7 Jun 2026',
-      '78901234',
-      true,
-    ),
-    _SupplierApplication(
-      'Qatar Home Essentials',
-      'Khalid Al-Dosari',
-      'sales@qhe.qa',
-      '+974 5534 5678',
-      'Home & Garden',
-      'pending',
-      '6 Jun 2026',
-      '12345678',
-      false,
-    ),
-    _SupplierApplication(
-      'AlFahad Electronics',
-      'Fahad Al-Qahtani',
-      'fahad@alfahadelec.com',
-      '+974 5556 7890',
-      'Electronics',
-      'approved',
-      '5 Jun 2026',
-      '34567890',
-      true,
-    ),
-    _SupplierApplication(
-      'Gulf Sports Co.',
-      'Omar Al-Thani',
-      'info@gulfsports.qa',
-      '+974 5523 4567',
-      'Sports & Outdoors',
-      'rejected',
-      '4 Jun 2026',
-      '90123456',
-      false,
-    ),
-  ];
+  List<_SupplierApplication>? _applications;
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 3, vsync: this);
+    _fetchData();
   }
 
   @override
@@ -87,21 +35,67 @@ class _AdminSupplierApprovalScreenState
     super.dispose();
   }
 
+  Future<void> _fetchData() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final res = await AdminService.getSupplierApplications();
+      final raw = (res['data'] as List? ?? []).cast<Map<String, dynamic>>();
+      setState(() {
+        _applications = raw.map((m) => _SupplierApplication(
+          id: m['id']?.toString() ?? '',
+          companyName: m['name'] ?? '',
+          contactName: m['contact_name'] ?? '',
+          email: m['email'] ?? '',
+          phone: m['phone'] ?? '',
+          category: m['category'] ?? '',
+          status: m['status'] ?? 'pending',
+          appliedDate: _formatDate(m['created_at'] ?? ''),
+          crNumber: m['cr_number'] ?? '',
+          hasDocuments: false,
+        )).toList();
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  String _formatDate(String iso) {
+    final dt = DateTime.tryParse(iso) ?? DateTime.now();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
+
   List<_SupplierApplication> _filtered(String status) {
-    var list = _applications.where((a) {
+    final apps = _applications ?? [];
+    var list = apps.where((a) {
       final q = _searchQuery.toLowerCase();
       return a.companyName.toLowerCase().contains(q) ||
           a.contactName.toLowerCase().contains(q) ||
           a.email.toLowerCase().contains(q);
     }).toList();
     if (status != 'all') {
-      list = list.where((a) => a.status == status).toList();
+      // Tab 0 = pending_approval, Tab 1 = active, Tab 2 = rejected/suspended
+      if (status == 'pending') {
+        list = list.where((a) => a.status == 'pending_approval' || a.status == 'pending').toList();
+      } else if (status == 'approved') {
+        list = list.where((a) => a.status == 'active').toList();
+      } else if (status == 'rejected') {
+        list = list.where((a) => a.status == 'rejected' || a.status == 'suspended').toList();
+      }
     }
     return list;
   }
 
   int get _pendingCount =>
-      _applications.where((a) => a.status == 'pending').length;
+      (_applications ?? []).where((a) => a.status == 'pending_approval' || a.status == 'pending').length;
 
   @override
   Widget build(BuildContext context) {
@@ -155,14 +149,38 @@ class _AdminSupplierApprovalScreenState
         children: [
           _buildSearchBar(),
           Expanded(
-            child: TabBarView(
-              controller: _tabCtrl,
-              children: [
-                _buildList('pending'),
-                _buildList('approved'),
-                _buildList('rejected'),
-              ],
-            ),
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline,
+                                size: 48, color: Colors.red),
+                            const SizedBox(height: 12),
+                            Text(_error!,
+                                style: const TextStyle(
+                                    color: AppColors.textSecondary),
+                                textAlign: TextAlign.center),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                                onPressed: _fetchData,
+                                child: const Text('Retry')),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _fetchData,
+                        child: TabBarView(
+                          controller: _tabCtrl,
+                          children: [
+                            _buildList('pending'),
+                            _buildList('approved'),
+                            _buildList('rejected'),
+                          ],
+                        ),
+                      ),
           ),
         ],
       ),
@@ -228,10 +246,10 @@ class _AdminSupplierApprovalScreenState
       itemCount: list.length,
       itemBuilder: (_, i) => _ApplicationCard(
         application: list[i],
-        onApprove: list[i].status == 'pending'
-            ? () => _handleDecision(list[i], 'approved')
+        onApprove: (list[i].status == 'pending_approval' || list[i].status == 'pending')
+            ? () => _handleDecision(list[i], 'active')
             : null,
-        onReject: list[i].status == 'pending'
+        onReject: (list[i].status == 'pending_approval' || list[i].status == 'pending')
             ? () => _showRejectDialog(list[i])
             : null,
         onView: () => _showDetailSheet(list[i]),
@@ -239,17 +257,28 @@ class _AdminSupplierApprovalScreenState
     );
   }
 
-  void _handleDecision(_SupplierApplication app, String decision) {
-    setState(() => app.status = decision);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-            '${app.companyName} has been ${decision == 'approved' ? 'approved' : 'rejected'}'),
-        backgroundColor:
-            decision == 'approved' ? const Color(0xFF2E7D32) : Colors.red,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  Future<void> _handleDecision(_SupplierApplication app, String decision, {String? reason}) async {
+    try {
+      await AdminService.updateSupplierStatus(app.id, decision, reason: reason);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              '${app.companyName} has been ${decision == 'active' ? 'approved' : 'rejected'}'),
+          backgroundColor:
+              decision == 'active' ? const Color(0xFF2E7D32) : Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _fetchData();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update status: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _showRejectDialog(_SupplierApplication app) {
@@ -283,8 +312,9 @@ class _AdminSupplierApprovalScreenState
           ),
           ElevatedButton(
             onPressed: () {
+              final reason = reasonCtrl.text.trim();
               Navigator.pop(context);
-              _handleDecision(app, 'rejected');
+              _handleDecision(app, 'rejected', reason: reason.isNotEmpty ? reason : null);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Reject', style: TextStyle(color: Colors.white)),
@@ -319,7 +349,7 @@ class _AdminSupplierApprovalScreenState
                       shape: BoxShape.circle,
                     ),
                     child: Center(
-                      child: Text(app.companyName[0],
+                      child: Text(app.companyName.isNotEmpty ? app.companyName[0] : '?',
                           style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
@@ -365,7 +395,7 @@ class _AdminSupplierApprovalScreenState
               _VerificationRow('Commercial Registration', app.hasDocuments),
               _VerificationRow('Tax Registration', app.hasDocuments),
               _VerificationRow('Bank Details', true),
-              if (app.status == 'pending') ...[
+              if (app.status == 'pending_approval' || app.status == 'pending') ...[
                 const SizedBox(height: 24),
                 Row(
                   children: [
@@ -392,7 +422,7 @@ class _AdminSupplierApprovalScreenState
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.pop(context);
-                          _handleDecision(app, 'approved');
+                          _handleDecision(app, 'active');
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2E7D32),
@@ -456,7 +486,10 @@ class _ApplicationCard extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                     child: Center(
-                      child: Text(application.companyName[0],
+                      child: Text(
+                          application.companyName.isNotEmpty
+                              ? application.companyName[0]
+                              : '?',
                           style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               color: AppColors.secondary,
@@ -572,12 +605,19 @@ class _StatusBadge extends StatelessWidget {
 
   Color get _color => switch (status) {
         'pending' => Colors.orange,
+        'pending_approval' => Colors.orange,
+        'active' => const Color(0xFF2E7D32),
         'approved' => const Color(0xFF2E7D32),
         'rejected' => Colors.red,
+        'suspended' => Colors.red,
         _ => AppColors.textSecondary,
       };
 
-  String get _label => status[0].toUpperCase() + status.substring(1);
+  String get _label => switch (status) {
+        'pending_approval' => 'Pending',
+        'active' => 'Approved',
+        _ => status[0].toUpperCase() + status.substring(1),
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -665,20 +705,22 @@ class _VerificationRow extends StatelessWidget {
 }
 
 class _SupplierApplication {
+  final String id;
   final String companyName, contactName, email, phone, category;
   String status;
   final String appliedDate, crNumber;
   final bool hasDocuments;
 
-  _SupplierApplication(
-    this.companyName,
-    this.contactName,
-    this.email,
-    this.phone,
-    this.category,
-    this.status,
-    this.appliedDate,
-    this.crNumber,
-    this.hasDocuments,
-  );
+  _SupplierApplication({
+    required this.id,
+    required this.companyName,
+    required this.contactName,
+    required this.email,
+    required this.phone,
+    required this.category,
+    required this.status,
+    required this.appliedDate,
+    required this.crNumber,
+    required this.hasDocuments,
+  });
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/services/supplier_service.dart';
+import '../../../core/services/api_client.dart';
 
 class SupplierPurchaseOrdersScreen extends StatefulWidget {
   const SupplierPurchaseOrdersScreen({super.key});
@@ -16,27 +18,15 @@ class _SupplierPurchaseOrdersScreenState
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
 
-  final List<_PurchaseOrder> _orders = [
-    _PurchaseOrder('PO-4201', 'Q Cart Warehouse', '2 items', 'QAR 245.00',
-        'new', '10 Jun 2026', ['Wireless Earbuds Pro ×1', 'USB-C Hub ×1']),
-    _PurchaseOrder('PO-4198', 'Q Cart Warehouse', '1 item', 'QAR 89.50',
-        'processing', '9 Jun 2026', ['USB-C Hub 7-in-1 ×1']),
-    _PurchaseOrder('PO-4185', 'Q Cart Warehouse', '3 items', 'QAR 512.00',
-        'shipped', '8 Jun 2026',
-        ['Mechanical Keyboard ×2', 'Webcam 1080p ×1']),
-    _PurchaseOrder('PO-4172', 'Q Cart Warehouse', '1 item', 'QAR 67.00',
-        'delivered', '7 Jun 2026', ['Mouse Pad XL ×2']),
-    _PurchaseOrder('PO-4160', 'Q Cart Warehouse', '2 items', 'QAR 198.75',
-        'delivered', '6 Jun 2026',
-        ['Phone Stand Adjustable ×3', 'HDMI Cable ×1']),
-    _PurchaseOrder('PO-4145', 'Q Cart Warehouse', '1 item', 'QAR 149.00',
-        'cancelled', '5 Jun 2026', ['Wireless Earbuds Pro ×1']),
-  ];
+  List<_PurchaseOrder>? _orders;
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 4, vsync: this);
+    _fetchData();
   }
 
   @override
@@ -46,27 +36,68 @@ class _SupplierPurchaseOrdersScreenState
     super.dispose();
   }
 
+  Future<void> _fetchData() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final res = await SupplierService.getOrders(page: 1);
+      final data = res['data'] as List<dynamic>? ?? [];
+      final orders = data.map((raw) {
+        final m = raw as Map<String, dynamic>;
+        final itemCount = m['item_count'];
+        final countNum = itemCount is int ? itemCount : int.tryParse(itemCount?.toString() ?? '0') ?? 0;
+        final total = m['total'];
+        final totalStr = total is num
+            ? 'QAR ${total.toStringAsFixed(2)}'
+            : 'QAR ${total ?? '0.00'}';
+        return _PurchaseOrder(
+          uuid: m['id']?.toString() ?? '',
+          id: m['order_number']?.toString() ?? m['id']?.toString() ?? '',
+          buyer: m['customer_name']?.toString() ?? '',
+          itemCount: '$countNum item${countNum != 1 ? 's' : ''}',
+          total: totalStr,
+          status: m['status']?.toString() ?? '',
+          date: _formatDate(m['created_at']?.toString() ?? ''),
+          items: const [],
+        );
+      }).toList();
+      if (mounted) {
+        setState(() {
+          _orders = orders;
+          _loading = false;
+        });
+      }
+    } on ApiException catch (e) {
+      if (mounted) setState(() { _error = e.message; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = 'Failed to load orders. Please try again.'; _loading = false; });
+    }
+  }
+
+  String _formatDate(String iso) {
+    final dt = DateTime.tryParse(iso) ?? DateTime.now();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
+
   List<_PurchaseOrder> _filtered(String filter) {
-    var list = _orders
+    final src = _orders ?? [];
+    var list = src
         .where((o) =>
             o.id.toLowerCase().contains(_searchQuery.toLowerCase()) ||
             o.buyer.toLowerCase().contains(_searchQuery.toLowerCase()))
         .toList();
     return switch (filter) {
-      'new' => list.where((o) => o.status == 'new').toList(),
-      'active' => list
-          .where((o) =>
-              o.status == 'processing' || o.status == 'shipped')
-          .toList(),
-      'done' => list
-          .where((o) =>
-              o.status == 'delivered' || o.status == 'cancelled')
-          .toList(),
+      'pending' => list.where((o) => o.status == 'pending' || o.status == 'confirmed').toList(),
+      'processing' => list.where((o) => o.status == 'processing' || o.status == 'out_for_delivery').toList(),
+      'done' => list.where((o) => o.status == 'delivered' || o.status == 'cancelled').toList(),
       _ => list,
     };
   }
 
-  int get _newCount => _orders.where((o) => o.status == 'new').length;
+  int get _pendingCount => (_orders ?? []).where((o) => o.status == 'pending' || o.status == 'confirmed').length;
 
   @override
   Widget build(BuildContext context) {
@@ -98,8 +129,8 @@ class _SupplierPurchaseOrdersScreenState
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('New'),
-                  if (_newCount > 0) ...[
+                  const Text('Pending'),
+                  if (_pendingCount > 0) ...[
                     const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -108,7 +139,7 @@ class _SupplierPurchaseOrdersScreenState
                         color: AppColors.secondary,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Text('$_newCount',
+                      child: Text('$_pendingCount',
                           style: const TextStyle(
                               fontSize: 10,
                               color: Colors.white,
@@ -118,24 +149,50 @@ class _SupplierPurchaseOrdersScreenState
                 ],
               ),
             ),
-            const Tab(text: 'Active'),
+            const Tab(text: 'Processing'),
             const Tab(text: 'Completed'),
           ],
         ),
       ),
-      body: Column(
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? _buildError()
+              : RefreshIndicator(
+                  onRefresh: _fetchData,
+                  child: Column(
+                    children: [
+                      _buildSearchBar(),
+                      Expanded(
+                        child: TabBarView(
+                          controller: _tabCtrl,
+                          children: [
+                            _buildList('all'),
+                            _buildList('pending'),
+                            _buildList('processing'),
+                            _buildList('done'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+    );
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _buildSearchBar(),
-          Expanded(
-            child: TabBarView(
-              controller: _tabCtrl,
-              children: [
-                _buildList('all'),
-                _buildList('new'),
-                _buildList('active'),
-                _buildList('done'),
-              ],
-            ),
+          Icon(Icons.error_outline, size: 64, color: AppColors.textSecondary.withOpacity(0.4)),
+          const SizedBox(height: 16),
+          Text(_error!, style: const TextStyle(color: AppColors.textSecondary)),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _fetchData,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
+            child: const Text('Retry', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -185,7 +242,7 @@ class _SupplierPurchaseOrdersScreenState
             Icon(Icons.receipt_long_outlined,
                 size: 64, color: AppColors.textSecondary.withOpacity(0.4)),
             const SizedBox(height: 16),
-            const Text('No orders found',
+            const Text('No items yet.',
                 style: TextStyle(color: AppColors.textSecondary)),
           ],
         ),
@@ -194,81 +251,168 @@ class _SupplierPurchaseOrdersScreenState
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       itemCount: list.length,
-      itemBuilder: (_, i) => _OrderCard(
-        order: list[i],
-        onAccept: list[i].status == 'new'
-            ? () => setState(() => list[i].status = 'processing')
-            : null,
-        onShip: list[i].status == 'processing'
-            ? () => _showShipSheet(list[i])
-            : null,
-        onView: () => _showOrderDetail(list[i]),
+      itemBuilder: (_, i) {
+        final o = list[i];
+        final cancellable = ['pending', 'confirmed', 'processing'].contains(o.status);
+        return _OrderCard(
+          order: o,
+          onAccept: (o.status == 'pending' || o.status == 'confirmed')
+              ? () => _acceptOrder(o)
+              : null,
+          onShip: o.status == 'processing' ? () => _showShipSheet(o) : null,
+          onCancel: cancellable ? () => _cancelOrder(o) : null,
+          onView: () => _showOrderDetail(o),
+        );
+      },
+    );
+  }
+
+  Future<void> _cancelOrder(_PurchaseOrder order) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Cancel Order'),
+        content: Text('Cancel order ${order.id}? This cannot be undone.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Keep Order')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Cancel Order',
+                  style: TextStyle(color: Colors.red))),
+        ],
       ),
     );
+    if (confirmed != true) return;
+    try {
+      await SupplierService.updateOrderStatus(order.uuid, 'cancelled');
+      if (!mounted) return;
+      setState(() => order.status = 'cancelled');
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to cancel order. Please retry.')),
+      );
+    }
+  }
+
+  Future<void> _acceptOrder(_PurchaseOrder order) async {
+    try {
+      await SupplierService.updateOrderStatus(order.uuid, 'processing');
+      if (!mounted) return;
+      setState(() => order.status = 'processing');
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to accept order. Please retry.')),
+      );
+    }
   }
 
   void _showShipSheet(_PurchaseOrder order) {
     final trackingCtrl = TextEditingController();
+    String selectedCarrier = 'aramex';
+    bool saving = false;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Padding(
-        padding: EdgeInsets.fromLTRB(
-            24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Ship Order ${order.id}',
-                style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary)),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: 'aramex',
-              decoration: const InputDecoration(
-                  labelText: 'Carrier',
-                  prefixIcon: Icon(Icons.local_shipping_outlined)),
-              items: ['aramex', 'dhl', 'q_cart_fleet']
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c.toUpperCase().replaceAll('_', ' '))))
-                  .toList(),
-              onChanged: (_) {},
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: trackingCtrl,
-              decoration: const InputDecoration(
-                  labelText: 'Tracking Number',
-                  prefixIcon: Icon(Icons.pin_outlined)),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: () {
-                  setState(() => order.status = 'shipped');
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${order.id} marked as shipped'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.secondary,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Confirm Shipment',
-                    style: TextStyle(color: Colors.white)),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.fromLTRB(
+              24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Ship Order ${order.id}',
+                  style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary)),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: selectedCarrier,
+                decoration: const InputDecoration(
+                    labelText: 'Carrier',
+                    prefixIcon: Icon(Icons.local_shipping_outlined)),
+                items: ['aramex', 'dhl', 'q_cart_fleet']
+                    .map((c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(c.toUpperCase().replaceAll('_', ' '))))
+                    .toList(),
+                onChanged: (v) => setSheet(() => selectedCarrier = v!),
               ),
-            ),
-          ],
+              const SizedBox(height: 14),
+              TextField(
+                controller: trackingCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Tracking Number',
+                    prefixIcon: Icon(Icons.pin_outlined)),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          setSheet(() => saving = true);
+                          try {
+                            await Future.wait([
+                              SupplierService.createShipment({
+                                'order_id': order.uuid,
+                                'carrier': selectedCarrier,
+                                'tracking_number': trackingCtrl.text.trim(),
+                              }),
+                              SupplierService.updateOrderStatus(
+                                  order.uuid, 'out_for_delivery'),
+                            ]);
+                            if (!mounted) return;
+                            setState(() => order.status = 'out_for_delivery');
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('${order.id} marked as shipped'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          } catch (_) {
+                            setSheet(() => saving = false);
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'Failed to create shipment. Please retry.')),
+                            );
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.secondary,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: saving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Text('Confirm Shipment',
+                          style: TextStyle(color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -310,19 +454,23 @@ class _SupplierPurchaseOrdersScreenState
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary)),
               const SizedBox(height: 8),
-              ...order.items.map((item) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.circle,
-                            size: 6, color: AppColors.textSecondary),
-                        const SizedBox(width: 8),
-                        Text(item,
-                            style: const TextStyle(
-                                color: AppColors.textPrimary)),
-                      ],
-                    ),
-                  )),
+              if (order.items.isEmpty)
+                Text(order.itemCount,
+                    style: const TextStyle(color: AppColors.textSecondary))
+              else
+                ...order.items.map((item) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.circle,
+                              size: 6, color: AppColors.textSecondary),
+                          const SizedBox(width: 8),
+                          Text(item,
+                              style: const TextStyle(
+                                  color: AppColors.textPrimary)),
+                        ],
+                      ),
+                    )),
               const Divider(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -351,25 +499,28 @@ class _OrderCard extends StatelessWidget {
   final _PurchaseOrder order;
   final VoidCallback? onAccept;
   final VoidCallback? onShip;
+  final VoidCallback? onCancel;
   final VoidCallback onView;
   const _OrderCard(
       {required this.order,
       this.onAccept,
       this.onShip,
+      this.onCancel,
       required this.onView});
 
   @override
   Widget build(BuildContext context) {
+    final isPending = order.status == 'pending' || order.status == 'confirmed';
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: order.status == 'new'
+          color: isPending
               ? AppColors.secondary.withOpacity(0.4)
               : AppColors.divider,
-          width: order.status == 'new' ? 1.5 : 1,
+          width: isPending ? 1.5 : 1,
         ),
       ),
       child: InkWell(
@@ -420,6 +571,22 @@ class _OrderCard extends StatelessWidget {
                           color: AppColors.textPrimary)),
                   Row(
                     children: [
+                      if (onCancel != null) ...[
+                        OutlinedButton(
+                          onPressed: onCancel,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            side: const BorderSide(color: Colors.red),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: const Text('Cancel',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
                       if (onAccept != null)
                         ElevatedButton(
                           onPressed: onAccept,
@@ -469,15 +636,24 @@ class _StatusChip extends StatelessWidget {
   const _StatusChip(this.status);
 
   Color get _color => switch (status) {
-        'new' => AppColors.secondary,
+        'pending' => AppColors.secondary,
+        'confirmed' => AppColors.secondary,
         'processing' => const Color(0xFFF57F17),
-        'shipped' => const Color(0xFF1565C0),
+        'out_for_delivery' => const Color(0xFF1565C0),
         'delivered' => const Color(0xFF2E7D32),
         'cancelled' => Colors.red,
         _ => AppColors.textSecondary,
       };
 
-  String get _label => status[0].toUpperCase() + status.substring(1);
+  String get _label => switch (status) {
+        'pending' => 'Pending',
+        'confirmed' => 'Confirmed',
+        'processing' => 'Processing',
+        'out_for_delivery' => 'Out for Delivery',
+        'delivered' => 'Delivered',
+        'cancelled' => 'Cancelled',
+        _ => status.isNotEmpty ? status[0].toUpperCase() + status.substring(1) : '',
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -497,10 +673,18 @@ class _StatusChip extends StatelessWidget {
 }
 
 class _PurchaseOrder {
-  final String id, buyer, itemCount, total, date;
+  final String uuid, id, buyer, itemCount, total, date;
   String status;
   final List<String> items;
 
-  _PurchaseOrder(this.id, this.buyer, this.itemCount, this.total, this.status,
-      this.date, this.items);
+  _PurchaseOrder({
+    required this.uuid,
+    required this.id,
+    required this.buyer,
+    required this.itemCount,
+    required this.total,
+    required this.status,
+    required this.date,
+    required this.items,
+  });
 }

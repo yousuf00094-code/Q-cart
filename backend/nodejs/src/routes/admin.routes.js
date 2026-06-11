@@ -44,11 +44,28 @@ router.get('/activity',
   ctrl.getActivityFeed
 );
 
-// GET /v1/admin/suppliers/payouts?days=30
+// GET /v1/admin/suppliers/payouts?days=30  — summary widget for admin dashboard
 router.get('/suppliers/payouts',
   queryValidator('days').optional().isInt({ min: 1, max: 365 }),
   validate,
   ctrl.getSupplierPayoutSummary
+);
+
+// GET /v1/admin/payouts?status=paid&supplier_id=<uuid>  — full paginated payout list
+const payoutsCtrl = require('../controllers/supplier_payouts.controller');
+router.get('/payouts',
+  queryValidator('status').optional().isIn(['pending', 'processing', 'paid', 'failed', 'on_hold']),
+  queryValidator('supplier_id').optional().isUUID(),
+  validate,
+  payoutsCtrl.listAll
+);
+
+// GET /v1/admin/supplier-performance?page=1&limit=24
+router.get('/supplier-performance',
+  queryValidator('page').optional().isInt({ min: 1 }),
+  queryValidator('limit').optional().isInt({ min: 1, max: 100 }),
+  validate,
+  ctrl.getSupplierPerformance
 );
 
 module.exports = router;

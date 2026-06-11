@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/admin_service.dart';
+import '../../../../core/services/api_client.dart';
 
 class AdminSupplierRiskScoreScreen extends StatefulWidget {
   const AdminSupplierRiskScoreScreen({super.key});
@@ -13,64 +16,74 @@ class _AdminSupplierRiskScoreScreenState
     extends State<AdminSupplierRiskScoreScreen> {
   String _filterRisk = 'all';
 
-  final List<_RiskSupplier> _suppliers = [
-    _RiskSupplier(
-      'Gulf Sports Co.',
-      'Sports',
-      72,
-      'high',
-      [
-        _RiskFactor('High return rate', 8.2, 5.0, 'critical'),
-        _RiskFactor('Low fill rate', 79.2, 90.0, 'warning'),
-        _RiskFactor('Declining rating', 3.8, 4.0, 'warning'),
-        _RiskFactor('Late shipments (15%)', 84.0, 95.0, 'critical'),
-      ],
-      '3 active warnings',
-    ),
-    _RiskSupplier(
-      'Doha Fashion House',
-      'Clothing',
-      45,
-      'medium',
-      [
-        _RiskFactor('Return rate elevated', 3.5, 3.0, 'warning'),
-        _RiskFactor('Occasional late delivery', 88.5, 95.0, 'warning'),
-      ],
-      '2 active warnings',
-    ),
-    _RiskSupplier(
-      'Qatar Home Essentials',
-      'Home & Garden',
-      28,
-      'low',
-      [
-        _RiskFactor('Inventory gaps (seasonal)', 93.2, 95.0, 'info'),
-      ],
-      '1 minor note',
-    ),
-    _RiskSupplier(
-      'TechStore Qatar',
-      'Electronics',
-      8,
-      'minimal',
-      [],
-      'No active issues',
-    ),
-    _RiskSupplier(
-      'AlFahad Electronics',
-      'Electronics',
-      15,
-      'minimal',
-      [
-        _RiskFactor('Minor stock outs (twice)', 95.1, 97.0, 'info'),
-      ],
-      '1 minor note',
-    ),
-  ];
+  List<_RiskSupplier>? _suppliers;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final res = await AdminService.getSupplierRiskScores(
+        riskLevel: _filterRisk == 'all' ? null : _filterRisk,
+      );
+      if (!mounted) return;
+      final data = res['data'] as List<dynamic>? ?? [];
+      setState(() {
+        _suppliers = data.map((r) {
+          final m = r as Map<String, dynamic>;
+          List<_RiskFactor> factors = [];
+          try {
+            final rawFactors = m['factors'];
+            List<dynamic> factorList = [];
+            if (rawFactors is String) {
+              factorList = jsonDecode(rawFactors) as List<dynamic>;
+            } else if (rawFactors is List) {
+              factorList = rawFactors;
+            }
+            factors = factorList.map((f) {
+              final fm = f as Map<String, dynamic>;
+              final severity = fm['severity']?.toString() ?? 'info';
+              return _RiskFactor(
+                fm['label']?.toString() ?? '',
+                double.tryParse(fm['value']?.toString() ?? '0') ?? 0,
+                0,
+                severity,
+              );
+            }).toList();
+          } catch (_) {}
+          final score = int.tryParse(m['score']?.toString() ?? '0') ?? 0;
+          final level = m['risk_level']?.toString() ?? 'minimal';
+          final summary = factors.isEmpty ? 'No active issues' : '${factors.length} factor${factors.length == 1 ? '' : 's'}';
+          return _RiskSupplier(
+            m['supplier_name']?.toString() ?? '',
+            '',
+            score,
+            level,
+            factors,
+            summary,
+          );
+        }).toList();
+        _loading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() { _error = e.message; _loading = false; });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _error = 'Failed to load risk scores. Pull down to retry.'; _loading = false; });
+    }
+  }
 
   List<_RiskSupplier> get _filtered {
-    if (_filterRisk == 'all') return _suppliers;
-    return _suppliers.where((s) => s.riskLevel == _filterRisk).toList();
+    final list = _suppliers ?? [];
+    if (_filterRisk == 'all') return list;
+    return list.where((s) => s.riskLevel == _filterRisk).toList();
   }
 
   @override
@@ -94,34 +107,48 @@ class _AdminSupplierRiskScoreScreenState
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildRiskSummaryBanner(),
-          _buildFilterChips(),
-          Expanded(
-            child: _filtered.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    itemCount: _filtered.length,
-                    itemBuilder: (_, i) => _RiskCard(
-                      supplier: _filtered[i],
-                      onView: () => _showRiskDetail(_filtered[i]),
-                      onAction: _filtered[i].riskLevel == 'high'
-                          ? () => _showActionSheet(_filtered[i])
-                          : null,
-                    ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.error_outline, size: 48, color: AppColors.textSecondary),
+                  const SizedBox(height: 12),
+                  Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
+                  const SizedBox(height: 16),
+                  ElevatedButton(onPressed: _fetchData, child: const Text('Retry')),
+                ])))
+              : RefreshIndicator(
+                  onRefresh: _fetchData,
+                  child: Column(
+                    children: [
+                      _buildRiskSummaryBanner(),
+                      _buildFilterChips(),
+                      Expanded(
+                        child: _filtered.isEmpty
+                            ? _buildEmptyState()
+                            : ListView.builder(
+                                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                                itemCount: _filtered.length,
+                                itemBuilder: (_, i) => _RiskCard(
+                                  supplier: _filtered[i],
+                                  onView: () => _showRiskDetail(_filtered[i]),
+                                  onAction: _filtered[i].riskLevel == 'high'
+                                      ? () => _showActionSheet(_filtered[i])
+                                      : null,
+                                ),
+                              ),
+                      ),
+                    ],
                   ),
-          ),
-        ],
-      ),
+                ),
     );
   }
 
   Widget _buildRiskSummaryBanner() {
-    final high = _suppliers.where((s) => s.riskLevel == 'high').length;
-    final medium = _suppliers.where((s) => s.riskLevel == 'medium').length;
-    final low = _suppliers.where((s) => s.riskLevel == 'low').length;
+    final list = _suppliers ?? [];
+    final high = list.where((s) => s.riskLevel == 'high').length;
+    final medium = list.where((s) => s.riskLevel == 'medium').length;
+    final low = list.where((s) => s.riskLevel == 'low').length;
 
     return Container(
       color: high > 0
