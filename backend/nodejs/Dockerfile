@@ -19,8 +19,9 @@ USER qcart
 
 ENV NODE_ENV=production
 
-# PORT is injected at runtime by the hosting platform (Render: 10000, local: 3000)
-EXPOSE 10000
+# Render reads this to determine which port to route to and injects it as PORT.
+# Must match process.env.PORT fallback in server.js.
+EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD wget -qO- http://localhost:${PORT:-3000}/v1/health || exit 1

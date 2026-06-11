@@ -16,7 +16,7 @@ const start = async () => {
     process.exit(1);
   }
 
-  const server = app.listen(PORT, () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     logger.info(`Q Cart API listening on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
   });
 
