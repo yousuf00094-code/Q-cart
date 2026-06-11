@@ -127,12 +127,6 @@ class SupplierService {
     return ApiClient.get('/supplier/products?$qs');
   }
 
-  static Future<Map<String, dynamic>> submitProduct(
-      Map<String, dynamic> data) async {
-    final res = await ApiClient.post('/products', data);
-    return res['data'] as Map<String, dynamic>;
-  }
-
   // ── Orders ─────────────────────────────────────────────────────────────────
 
   static Future<Map<String, dynamic>> getOrders({
@@ -197,5 +191,13 @@ class SupplierService {
       Map<String, dynamic> data) async {
     final res = await ApiClient.post('/supplier/products', data);
     return res['data'] as Map<String, dynamic>;
+  }
+
+  // ── Image Upload ──────────────────────────────────────────────────────────
+
+  static Future<String> uploadImage(String filePath) async {
+    final res = await ApiClient.uploadFile('/uploads/images', filePath, 'image');
+    final data = res['data'] as Map<String, dynamic>;
+    return data['url']?.toString() ?? '';
   }
 }

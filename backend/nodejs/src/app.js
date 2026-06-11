@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const path       = require('path');
 const express    = require('express');
 const helmet     = require('helmet');
 const cors       = require('cors');
@@ -51,6 +52,12 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev', {
 
 // ── Rate limiting ─────────────────────────────────────────────────────────
 app.use('/v1', defaultLimiter);
+
+// ── Static files — uploaded images ────────────────────────────────────────
+const uploadDir = process.env.UPLOAD_DIR
+  ? path.resolve(process.env.UPLOAD_DIR)
+  : path.join(__dirname, '..', 'uploads', 'images');
+app.use('/uploads/images', express.static(uploadDir));
 
 // ── Routes ────────────────────────────────────────────────────────────────
 app.use('/v1', routes);

@@ -35,7 +35,7 @@ router.get('/inventory',
 
 router.patch('/orders/:id/status',
   param('id').isUUID(),
-  body('status').isIn(['processing', 'out_for_delivery', 'delivered']),
+  body('status').isIn(['processing', 'out_for_delivery', 'delivered', 'cancelled']),
   validate,
   ctrl.updateOrderStatus
 );

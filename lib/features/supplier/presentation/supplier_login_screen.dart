@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/api_client.dart';
+import '../../../core/services/supplier_service.dart';
 
 class SupplierLoginScreen extends StatefulWidget {
   const SupplierLoginScreen({super.key});
@@ -345,70 +346,217 @@ class _SupplierLoginScreenState extends State<SupplierLoginScreen> {
   }
 
   void _showApplySheet() {
+    final formKey  = GlobalKey<FormState>();
+    final bizCtrl  = TextEditingController();
+    final crCtrl   = TextEditingController();
+    final emailCtrl= TextEditingController();
+    final phoneCtrl= TextEditingController();
+    final catCtrl  = TextEditingController();
+    bool submitting = false;
+    String? errorMsg;
+    bool success = false;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.7,
-        builder: (_, scrollCtrl) => SingleChildScrollView(
-          controller: scrollCtrl,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Become a Supplier',
-                  style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary)),
-              const SizedBox(height: 8),
-              const Text(
-                  'Join the Q Cart supplier network and reach thousands of customers in Qatar.',
-                  style: TextStyle(color: AppColors.textSecondary)),
-              const SizedBox(height: 24),
-              ..._applyFields(),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.secondary,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSheet) => DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.8,
+          builder: (_, scrollCtrl) => SingleChildScrollView(
+            controller: scrollCtrl,
+            padding: EdgeInsets.fromLTRB(
+                24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+            child: success
+                ? _buildApplySuccess(() => Navigator.pop(context))
+                : Form(
+                    key: formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Become a Supplier',
+                            style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary)),
+                        const SizedBox(height: 8),
+                        const Text(
+                            'Join the Q Cart supplier network and reach thousands of customers in Qatar.',
+                            style: TextStyle(color: AppColors.textSecondary)),
+                        const SizedBox(height: 24),
+                        TextFormField(
+                          controller: bizCtrl,
+                          decoration: const InputDecoration(
+                              labelText: 'Business Name *',
+                              prefixIcon: Icon(Icons.business_outlined)),
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'Required'
+                              : null,
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: crCtrl,
+                          decoration: const InputDecoration(
+                              labelText: 'Commercial Registration No.',
+                              prefixIcon: Icon(Icons.badge_outlined)),
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: emailCtrl,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: const InputDecoration(
+                              labelText: 'Business Email *',
+                              prefixIcon: Icon(Icons.email_outlined)),
+                          validator: (v) => v == null || !v.contains('@')
+                              ? 'Enter a valid email'
+                              : null,
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: phoneCtrl,
+                          keyboardType: TextInputType.phone,
+                          decoration: const InputDecoration(
+                              labelText: 'Phone Number',
+                              prefixIcon: Icon(Icons.phone_outlined)),
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: catCtrl,
+                          decoration: const InputDecoration(
+                              labelText: 'Primary Product Category',
+                              prefixIcon: Icon(Icons.category_outlined)),
+                        ),
+                        if (errorMsg != null) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFDECEC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFE57373)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline,
+                                    color: Color(0xFFC62828), size: 18),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(errorMsg!,
+                                      style: const TextStyle(
+                                          color: Color(0xFFC62828),
+                                          fontSize: 13)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton(
+                            onPressed: submitting
+                                ? null
+                                : () async {
+                                    if (!formKey.currentState!.validate()) return;
+                                    setSheet(() {
+                                      submitting = true;
+                                      errorMsg = null;
+                                    });
+                                    try {
+                                      await ApiClient.post('/suppliers/apply', {
+                                        'business_name': bizCtrl.text.trim(),
+                                        'email': emailCtrl.text.trim(),
+                                        if (phoneCtrl.text.trim().isNotEmpty)
+                                          'phone': phoneCtrl.text.trim(),
+                                        if (crCtrl.text.trim().isNotEmpty)
+                                          'cr_number': crCtrl.text.trim(),
+                                        if (catCtrl.text.trim().isNotEmpty)
+                                          'category': catCtrl.text.trim(),
+                                      });
+                                      setSheet(() { submitting = false; success = true; });
+                                    } on ApiException catch (e) {
+                                      setSheet(() {
+                                        submitting = false;
+                                        errorMsg = e.code == 'EMAIL_EXISTS'
+                                            ? 'An application with this email already exists.'
+                                            : e.message;
+                                      });
+                                    } catch (_) {
+                                      setSheet(() {
+                                        submitting = false;
+                                        errorMsg = 'Connection failed. Please try again.';
+                                      });
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.secondary,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: submitting
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white))
+                                : const Text('Submit Application',
+                                    style: TextStyle(color: Colors.white)),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: const Text('Submit Application',
-                      style: TextStyle(color: Colors.white)),
-                ),
-              ),
-            ],
           ),
         ),
       ),
     );
   }
 
-  List<Widget> _applyFields() {
-    const fields = [
-      ('Business Name',                   Icons.business_outlined,   TextInputType.text),
-      ('Commercial Registration No.',     Icons.badge_outlined,      TextInputType.text),
-      ('Business Email',                  Icons.email_outlined,      TextInputType.emailAddress),
-      ('Phone Number',                    Icons.phone_outlined,      TextInputType.phone),
-      ('Primary Product Category',        Icons.category_outlined,   TextInputType.text),
-    ];
-    return fields
-        .map((f) => Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: TextField(
-                keyboardType: f.$3,
-                decoration: InputDecoration(
-                    labelText: f.$1, prefixIcon: Icon(f.$2)),
-              ),
-            ))
-        .toList();
+  Widget _buildApplySuccess(VoidCallback onDone) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 16),
+        Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+              color: const Color(0xFF2E7D32).withOpacity(0.1),
+              shape: BoxShape.circle),
+          child: const Icon(Icons.check_circle_outline,
+              color: Color(0xFF2E7D32), size: 40),
+        ),
+        const SizedBox(height: 20),
+        const Text('Application Submitted!',
+            style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary)),
+        const SizedBox(height: 8),
+        const Text(
+            'Our team will review your application within 2 business days and contact you by email.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+        const SizedBox(height: 28),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton(
+            onPressed: onDone,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.secondary,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Done', style: TextStyle(color: Colors.white)),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
   }
 }

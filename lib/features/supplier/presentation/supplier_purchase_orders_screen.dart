@@ -251,17 +251,55 @@ class _SupplierPurchaseOrdersScreenState
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       itemCount: list.length,
-      itemBuilder: (_, i) => _OrderCard(
-        order: list[i],
-        onAccept: (list[i].status == 'pending' || list[i].status == 'confirmed')
-            ? () => _acceptOrder(list[i])
-            : null,
-        onShip: list[i].status == 'processing'
-            ? () => _showShipSheet(list[i])
-            : null,
-        onView: () => _showOrderDetail(list[i]),
+      itemBuilder: (_, i) {
+        final o = list[i];
+        final cancellable = ['pending', 'confirmed', 'processing'].contains(o.status);
+        return _OrderCard(
+          order: o,
+          onAccept: (o.status == 'pending' || o.status == 'confirmed')
+              ? () => _acceptOrder(o)
+              : null,
+          onShip: o.status == 'processing' ? () => _showShipSheet(o) : null,
+          onCancel: cancellable ? () => _cancelOrder(o) : null,
+          onView: () => _showOrderDetail(o),
+        );
+      },
+    );
+  }
+
+  Future<void> _cancelOrder(_PurchaseOrder order) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Cancel Order'),
+        content: Text('Cancel order ${order.id}? This cannot be undone.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Keep Order')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Cancel Order',
+                  style: TextStyle(color: Colors.red))),
+        ],
       ),
     );
+    if (confirmed != true) return;
+    try {
+      await SupplierService.updateOrderStatus(order.uuid, 'cancelled');
+      if (!mounted) return;
+      setState(() => order.status = 'cancelled');
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to cancel order. Please retry.')),
+      );
+    }
   }
 
   Future<void> _acceptOrder(_PurchaseOrder order) async {
@@ -461,11 +499,13 @@ class _OrderCard extends StatelessWidget {
   final _PurchaseOrder order;
   final VoidCallback? onAccept;
   final VoidCallback? onShip;
+  final VoidCallback? onCancel;
   final VoidCallback onView;
   const _OrderCard(
       {required this.order,
       this.onAccept,
       this.onShip,
+      this.onCancel,
       required this.onView});
 
   @override
@@ -531,6 +571,22 @@ class _OrderCard extends StatelessWidget {
                           color: AppColors.textPrimary)),
                   Row(
                     children: [
+                      if (onCancel != null) ...[
+                        OutlinedButton(
+                          onPressed: onCancel,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            side: const BorderSide(color: Colors.red),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: const Text('Cancel',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
                       if (onAccept != null)
                         ElevatedButton(
                           onPressed: onAccept,

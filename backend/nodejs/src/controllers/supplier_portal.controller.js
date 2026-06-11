@@ -139,13 +139,30 @@ const updateOrderStatus = async (req, res, next) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    // Verify this order contains items from this supplier
+    // Verify this order contains items from this supplier and fetch current status
     const check = await query(
-      `SELECT COUNT(*) FROM order_items WHERE order_id = $1 AND supplier_id = $2`,
-      [id, supplierId]
+      `SELECT o.status AS current_status
+         FROM orders o
+         JOIN order_items oi ON oi.order_id = o.id
+        WHERE oi.supplier_id = $1 AND o.id = $2
+        LIMIT 1`,
+      [supplierId, id]
     );
-    if (parseInt(check.rows[0].count, 10) === 0) {
+    if (!check.rows.length) {
       throw new AppError('Order not found.', 404, 'NOT_FOUND');
+    }
+
+    const currentStatus = check.rows[0].current_status;
+
+    // Suppliers may only cancel orders that have not yet shipped
+    if (status === 'cancelled') {
+      const cancellable = ['pending', 'confirmed', 'processing'];
+      if (!cancellable.includes(currentStatus)) {
+        throw new AppError(
+          'Orders that have already shipped cannot be cancelled by the supplier.',
+          422, 'INVALID_TRANSITION'
+        );
+      }
     }
 
     const result = await query(

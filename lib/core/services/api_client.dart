@@ -44,6 +44,19 @@ class ApiClient {
     _handle(response);
   }
 
+  static Future<Map<String, dynamic>> uploadFile(
+      String path, String filePath, String fieldName) async {
+    final uri = Uri.parse('$baseUrl$path');
+    final request = http.MultipartRequest('POST', uri);
+    if (_accessToken != null) {
+      request.headers['Authorization'] = 'Bearer $_accessToken';
+    }
+    request.files.add(await http.MultipartFile.fromPath(fieldName, filePath));
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    return _handle(response);
+  }
+
   static Map<String, dynamic> _handle(http.Response response) {
     final decoded = json.decode(utf8.decode(response.bodyBytes));
     final body = decoded is Map<String, dynamic> ? decoded : <String, dynamic>{'data': decoded};

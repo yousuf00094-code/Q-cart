@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/supplier_service.dart';
 import '../../../core/services/api_client.dart';
@@ -45,7 +46,8 @@ class _SupplierProductSubmissionScreenState
   List<Map<String, dynamic>> _categories = [];
   bool _catLoading = true;
 
-  final List<String> _mockImages = ['img1', 'img2', 'img3'];
+  final List<String> _imageUrls = [];
+  bool _uploadingImage = false;
 
   @override
   void initState() {
@@ -107,6 +109,7 @@ class _SupplierProductSubmissionScreenState
           'reorder_point': int.tryParse(_reorderCtrl.text.trim()),
         if (_weightCtrl.text.trim().isNotEmpty)
           'weight_grams': ((double.tryParse(_weightCtrl.text.trim()) ?? 0) * 1000).round(),
+        if (_imageUrls.isNotEmpty) 'images': _imageUrls,
         'is_active': false,
       };
 
@@ -256,6 +259,27 @@ class _SupplierProductSubmissionScreenState
     );
   }
 
+  Future<void> _pickAndUploadImage() async {
+    if (_imageUrls.length >= 8) return;
+    final picker = ImagePicker();
+    final XFile? file = await picker.pickImage(
+        source: ImageSource.gallery, imageQuality: 85, maxWidth: 1200);
+    if (file == null) return;
+    setState(() => _uploadingImage = true);
+    try {
+      final url = await SupplierService.uploadImage(file.path);
+      if (!mounted) return;
+      setState(() => _imageUrls.add(url));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Image upload failed. Please try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _uploadingImage = false);
+    }
+  }
+
   Widget _buildImageUploadSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -274,8 +298,8 @@ class _SupplierProductSubmissionScreenState
           child: ListView(
             scrollDirection: Axis.horizontal,
             children: [
-              ..._mockImages.map((img) => _buildImageThumbnail(img)),
-              _buildAddImageTile(),
+              ..._imageUrls.asMap().entries.map((e) => _buildImageThumbnail(e.value, e.key)),
+              if (_imageUrls.length < 8) _buildAddImageTile(),
             ],
           ),
         ),
@@ -283,7 +307,7 @@ class _SupplierProductSubmissionScreenState
     );
   }
 
-  Widget _buildImageThumbnail(String img) {
+  Widget _buildImageThumbnail(String url, int index) {
     return Container(
       width: 88,
       height: 88,
@@ -294,13 +318,19 @@ class _SupplierProductSubmissionScreenState
         border: Border.all(color: AppColors.primary.withOpacity(0.4)),
       ),
       child: Stack(
+        fit: StackFit.expand,
         children: [
-          const Center(child: Icon(Icons.image_outlined, color: AppColors.primary, size: 32)),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.network(url, fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    const Icon(Icons.broken_image_outlined, color: AppColors.primary, size: 32)),
+          ),
           Positioned(
             top: 4,
             right: 4,
             child: GestureDetector(
-              onTap: () => setState(() => _mockImages.remove(img)),
+              onTap: () => setState(() => _imageUrls.removeAt(index)),
               child: Container(
                 width: 20,
                 height: 20,
@@ -310,6 +340,25 @@ class _SupplierProductSubmissionScreenState
               ),
             ),
           ),
+          if (index == 0)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withOpacity(0.8),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(10),
+                    bottomRight: Radius.circular(10),
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: const Text('Cover',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w600)),
+              ),
+            ),
         ],
       ),
     );
@@ -317,7 +366,7 @@ class _SupplierProductSubmissionScreenState
 
   Widget _buildAddImageTile() {
     return GestureDetector(
-      onTap: () {},
+      onTap: _uploadingImage ? null : _pickAndUploadImage,
       child: Container(
         width: 88,
         height: 88,
@@ -327,17 +376,22 @@ class _SupplierProductSubmissionScreenState
           border: Border.all(
               color: AppColors.divider, style: BorderStyle.solid, width: 1.5),
         ),
-        child: const Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.add_photo_alternate_outlined,
-                color: AppColors.textSecondary, size: 28),
-            SizedBox(height: 4),
-            Text('Add',
-                style:
-                    TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-          ],
-        ),
+        child: _uploadingImage
+            ? const Center(
+                child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2)))
+            : const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_photo_alternate_outlined,
+                      color: AppColors.textSecondary, size: 28),
+                  SizedBox(height: 4),
+                  Text('Add',
+                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                ],
+              ),
       ),
     );
   }
