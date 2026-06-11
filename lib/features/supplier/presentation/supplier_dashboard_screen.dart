@@ -46,18 +46,21 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
         SupplierService.getOrders(page: 1),
         SupplierService.getProducts(status: 'inactive'),
         SupplierService.getInventory(lowStock: true),
+        SupplierService.getRatingsSummary(),
       ]);
 
       final dashboard = results[0] as Map<String, dynamic>;
       final ordersResult = results[1] as Map<String, dynamic>;
       final inactiveResult = results[2] as Map<String, dynamic>;
       final lowStockResult = results[3] as Map<String, dynamic>;
+      final ratingSummary = results[4] as Map<String, dynamic>;
 
-      // Map KPIs
-      final revenueMtd = dashboard['revenue_mtd'];
-      final totalOrders = dashboard['total_orders'];
-      final activeProducts = dashboard['active_products'];
-      final avgRating = dashboard['avg_rating'];
+      // Map KPIs — analytics endpoint nests data under 'kpis'
+      final kpis = dashboard['kpis'] as Map<String, dynamic>? ?? {};
+      final revenueMtd = kpis['revenue_mtd'];
+      final totalOrders = kpis['total_orders'];
+      final activeProducts = kpis['active_products'];
+      final avgRating = ratingSummary['avg_rating'];
 
       final kpis = [
         _KpiData(

@@ -53,7 +53,8 @@ class _SupplierPurchaseOrdersScreenState
             ? 'QAR ${total.toStringAsFixed(2)}'
             : 'QAR ${total ?? '0.00'}';
         return _PurchaseOrder(
-          id: m['order_number']?.toString() ?? '',
+          uuid: m['id']?.toString() ?? '',
+          id: m['order_number']?.toString() ?? m['id']?.toString() ?? '',
           buyer: m['customer_name']?.toString() ?? '',
           itemCount: '$countNum item${countNum != 1 ? 's' : ''}',
           total: totalStr,
@@ -253,7 +254,7 @@ class _SupplierPurchaseOrdersScreenState
       itemBuilder: (_, i) => _OrderCard(
         order: list[i],
         onAccept: (list[i].status == 'pending' || list[i].status == 'confirmed')
-            ? () => setState(() => list[i].status = 'processing')
+            ? () => _acceptOrder(list[i])
             : null,
         onShip: list[i].status == 'processing'
             ? () => _showShipSheet(list[i])
@@ -263,68 +264,117 @@ class _SupplierPurchaseOrdersScreenState
     );
   }
 
+  Future<void> _acceptOrder(_PurchaseOrder order) async {
+    try {
+      await SupplierService.updateOrderStatus(order.uuid, 'processing');
+      if (!mounted) return;
+      setState(() => order.status = 'processing');
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to accept order. Please retry.')),
+      );
+    }
+  }
+
   void _showShipSheet(_PurchaseOrder order) {
     final trackingCtrl = TextEditingController();
+    String selectedCarrier = 'aramex';
+    bool saving = false;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Padding(
-        padding: EdgeInsets.fromLTRB(
-            24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Ship Order ${order.id}',
-                style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary)),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: 'aramex',
-              decoration: const InputDecoration(
-                  labelText: 'Carrier',
-                  prefixIcon: Icon(Icons.local_shipping_outlined)),
-              items: ['aramex', 'dhl', 'q_cart_fleet']
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c.toUpperCase().replaceAll('_', ' '))))
-                  .toList(),
-              onChanged: (_) {},
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: trackingCtrl,
-              decoration: const InputDecoration(
-                  labelText: 'Tracking Number',
-                  prefixIcon: Icon(Icons.pin_outlined)),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: () {
-                  setState(() => order.status = 'out_for_delivery');
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${order.id} marked as shipped'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.secondary,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Confirm Shipment',
-                    style: TextStyle(color: Colors.white)),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.fromLTRB(
+              24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Ship Order ${order.id}',
+                  style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary)),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: selectedCarrier,
+                decoration: const InputDecoration(
+                    labelText: 'Carrier',
+                    prefixIcon: Icon(Icons.local_shipping_outlined)),
+                items: ['aramex', 'dhl', 'q_cart_fleet']
+                    .map((c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(c.toUpperCase().replaceAll('_', ' '))))
+                    .toList(),
+                onChanged: (v) => setSheet(() => selectedCarrier = v!),
               ),
-            ),
-          ],
+              const SizedBox(height: 14),
+              TextField(
+                controller: trackingCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Tracking Number',
+                    prefixIcon: Icon(Icons.pin_outlined)),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          setSheet(() => saving = true);
+                          try {
+                            await Future.wait([
+                              SupplierService.createShipment({
+                                'order_id': order.uuid,
+                                'carrier': selectedCarrier,
+                                'tracking_number': trackingCtrl.text.trim(),
+                              }),
+                              SupplierService.updateOrderStatus(
+                                  order.uuid, 'out_for_delivery'),
+                            ]);
+                            if (!mounted) return;
+                            setState(() => order.status = 'out_for_delivery');
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('${order.id} marked as shipped'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          } catch (_) {
+                            setSheet(() => saving = false);
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'Failed to create shipment. Please retry.')),
+                            );
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.secondary,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: saving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Text('Confirm Shipment',
+                          style: TextStyle(color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -567,11 +617,12 @@ class _StatusChip extends StatelessWidget {
 }
 
 class _PurchaseOrder {
-  final String id, buyer, itemCount, total, date;
+  final String uuid, id, buyer, itemCount, total, date;
   String status;
   final List<String> items;
 
   _PurchaseOrder({
+    required this.uuid,
     required this.id,
     required this.buyer,
     required this.itemCount,

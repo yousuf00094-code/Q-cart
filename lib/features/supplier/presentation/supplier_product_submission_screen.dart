@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/services/supplier_service.dart';
+import '../../../core/services/api_client.dart';
 
 class SupplierProductSubmissionScreen extends StatefulWidget {
   const SupplierProductSubmissionScreen({super.key});
@@ -14,14 +16,14 @@ class _SupplierProductSubmissionScreenState
     with SingleTickerProviderStateMixin {
   late TabController _tabCtrl;
   final _formKey = GlobalKey<FormState>();
-  bool _loading = false;
+  bool _submitting = false;
+  String? _submitError;
 
   // Basic Info
   final _nameCtrl = TextEditingController();
   final _skuCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-  String _selectedCategory = 'Electronics';
-  String _selectedBrand = '';
+  String _selectedCategoryId = '';
 
   // Pricing
   final _priceCtrl = TextEditingController();
@@ -39,10 +41,9 @@ class _SupplierProductSubmissionScreenState
   final _widthCtrl = TextEditingController();
   final _heightCtrl = TextEditingController();
 
-  final _categories = [
-    'Electronics', 'Clothing', 'Home & Garden', 'Sports', 'Books',
-    'Beauty', 'Toys', 'Automotive', 'Food & Grocery',
-  ];
+  // Categories loaded from API
+  List<Map<String, dynamic>> _categories = [];
+  bool _catLoading = true;
 
   final List<String> _mockImages = ['img1', 'img2', 'img3'];
 
@@ -50,6 +51,7 @@ class _SupplierProductSubmissionScreenState
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 4, vsync: this);
+    _loadCategories();
   }
 
   @override
@@ -63,13 +65,62 @@ class _SupplierProductSubmissionScreenState
     super.dispose();
   }
 
+  Future<void> _loadCategories() async {
+    try {
+      final cats = await SupplierService.getCategories();
+      if (!mounted) return;
+      setState(() {
+        _categories = cats;
+        _catLoading = false;
+        if (cats.isNotEmpty) {
+          _selectedCategoryId = cats[0]['id']?.toString() ?? '';
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _catLoading = false);
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _loading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() => _loading = false);
-    _showSuccessSheet();
+    if (_selectedCategoryId.isEmpty) {
+      setState(() => _submitError = 'Please select a category.');
+      return;
+    }
+    setState(() { _submitting = true; _submitError = null; });
+
+    try {
+      final data = <String, dynamic>{
+        'name': _nameCtrl.text.trim(),
+        'category_id': _selectedCategoryId,
+        'price': double.parse(_priceCtrl.text.trim()),
+        'description': _descCtrl.text.trim(),
+        if (_skuCtrl.text.trim().isNotEmpty) 'sku': _skuCtrl.text.trim(),
+        if (_comparePriceCtrl.text.trim().isNotEmpty)
+          'compare_at_price': double.tryParse(_comparePriceCtrl.text.trim()),
+        if (_costCtrl.text.trim().isNotEmpty)
+          'cost_price': double.tryParse(_costCtrl.text.trim()),
+        if (_trackInventory && _stockCtrl.text.trim().isNotEmpty)
+          'stock_quantity': int.tryParse(_stockCtrl.text.trim()) ?? 0,
+        if (_trackInventory && _reorderCtrl.text.trim().isNotEmpty)
+          'reorder_point': int.tryParse(_reorderCtrl.text.trim()),
+        if (_weightCtrl.text.trim().isNotEmpty)
+          'weight_grams': ((double.tryParse(_weightCtrl.text.trim()) ?? 0) * 1000).round(),
+        'is_active': false,
+      };
+
+      await SupplierService.submitProduct(data);
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      _showSuccessSheet();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() { _submitting = false; _submitError = e.message; });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _submitting = false; _submitError = 'Failed to submit. Please try again.'; });
+    }
   }
 
   @override
@@ -108,13 +159,27 @@ class _SupplierProductSubmissionScreenState
       ),
       body: Form(
         key: _formKey,
-        child: TabBarView(
-          controller: _tabCtrl,
+        child: Column(
           children: [
-            _buildBasicInfoTab(),
-            _buildPricingTab(),
-            _buildInventoryTab(),
-            _buildShippingTab(),
+            if (_submitError != null)
+              Container(
+                width: double.infinity,
+                color: Colors.red.withOpacity(0.1),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Text(_submitError!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ),
+            Expanded(
+              child: TabBarView(
+                controller: _tabCtrl,
+                children: [
+                  _buildBasicInfoTab(),
+                  _buildPricingTab(),
+                  _buildInventoryTab(),
+                  _buildShippingTab(),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -146,16 +211,25 @@ class _SupplierProductSubmissionScreenState
                   prefixIcon: Icon(Icons.qr_code_outlined)),
             ),
             const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
-              value: _selectedCategory,
-              decoration: const InputDecoration(
-                  labelText: 'Category *',
-                  prefixIcon: Icon(Icons.category_outlined)),
-              items: _categories
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                  .toList(),
-              onChanged: (v) => setState(() => _selectedCategory = v!),
-            ),
+            _catLoading
+                ? const Center(child: CircularProgressIndicator())
+                : DropdownButtonFormField<String>(
+                    value: _selectedCategoryId.isEmpty ? null : _selectedCategoryId,
+                    decoration: const InputDecoration(
+                        labelText: 'Category *',
+                        prefixIcon: Icon(Icons.category_outlined)),
+                    items: _categories
+                        .map((c) => DropdownMenuItem(
+                              value: c['id']?.toString() ?? '',
+                              child: Text(c['name']?.toString() ?? ''),
+                            ))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) setState(() => _selectedCategoryId = v);
+                    },
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
+                  ),
             const SizedBox(height: 14),
             TextFormField(
               decoration: const InputDecoration(
@@ -357,6 +431,10 @@ class _SupplierProductSubmissionScreenState
   }
 
   Widget _buildMarginCard() {
+    final price = double.tryParse(_priceCtrl.text) ?? 0;
+    final commission = price * 0.10;
+    final vat = price * 0.05;
+    final payout = price - commission - vat;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -372,10 +450,10 @@ class _SupplierProductSubmissionScreenState
                   fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
           const SizedBox(height: 12),
           ...[
-            ('Selling Price', 'QAR 149.00'),
-            ('Q Cart Commission (10%)', '- QAR 14.90'),
-            ('VAT (5%)', '- QAR 7.45'),
-            ('Your Estimated Payout', 'QAR 126.65'),
+            ('Selling Price', 'QAR ${price.toStringAsFixed(2)}'),
+            ('Q Cart Commission (10%)', '- QAR ${commission.toStringAsFixed(2)}'),
+            ('VAT (5%)', '- QAR ${vat.toStringAsFixed(2)}'),
+            ('Your Estimated Payout', 'QAR ${payout.toStringAsFixed(2)}'),
           ].map(
             (r) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
@@ -611,7 +689,7 @@ class _SupplierProductSubmissionScreenState
           Expanded(
             flex: 2,
             child: ElevatedButton(
-              onPressed: _loading
+              onPressed: _submitting
                   ? null
                   : () {
                       if (_tabCtrl.index < 3) {
@@ -626,7 +704,7 @@ class _SupplierProductSubmissionScreenState
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
-              child: _loading
+              child: _submitting
                   ? const SizedBox(
                       width: 20,
                       height: 20,

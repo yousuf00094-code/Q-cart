@@ -2,6 +2,7 @@
 
 const { query } = require('../config/database');
 const ProductModel = require('../models/product.model');
+const InventoryModel = require('../models/inventory.model');
 const { AppError } = require('../middleware/errorHandler');
 const { parsePagination, buildMeta } = require('../utils/pagination');
 const { getSupplierIdForUser } = require('../services/supplier_analytics.service');
@@ -131,4 +132,70 @@ const inventory = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { products, orders, inventory };
+// PATCH /v1/supplier/orders/:id/status
+const updateOrderStatus = async (req, res, next) => {
+  try {
+    const supplierId = await resolveSupplier(req.user.id);
+    const { id } = req.params;
+    const { status } = req.body;
+
+    // Verify this order contains items from this supplier
+    const check = await query(
+      `SELECT COUNT(*) FROM order_items WHERE order_id = $1 AND supplier_id = $2`,
+      [id, supplierId]
+    );
+    if (parseInt(check.rows[0].count, 10) === 0) {
+      throw new AppError('Order not found.', 404, 'NOT_FOUND');
+    }
+
+    const result = await query(
+      `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2
+       RETURNING id, order_number, status, updated_at`,
+      [status, id]
+    );
+    res.json({ data: result.rows[0] });
+  } catch (err) { next(err); }
+};
+
+// POST /v1/supplier/inventory/:productId/adjust
+const adjustInventory = async (req, res, next) => {
+  try {
+    const supplierId = await resolveSupplier(req.user.id);
+    const { productId } = req.params;
+    const { quantity_delta, notes } = req.body;
+
+    // Verify the product belongs to this supplier
+    const check = await query(
+      `SELECT id FROM products WHERE id = $1 AND supplier_id = $2`,
+      [productId, supplierId]
+    );
+    if (check.rows.length === 0) {
+      throw new AppError('Product not found.', 404, 'NOT_FOUND');
+    }
+
+    const updated = await InventoryModel.adjust(null, productId, quantity_delta);
+    if (!updated) {
+      throw new AppError('Inventory record not found. Ensure the product has been stocked.', 404, 'NOT_FOUND');
+    }
+    res.json({ data: { product_id: productId, quantity: updated.quantity, notes } });
+  } catch (err) { next(err); }
+};
+
+// POST /v1/supplier/products
+const submitProduct = async (req, res, next) => {
+  try {
+    const supplierId = await resolveSupplier(req.user.id);
+    const slug = req.body.name
+      ? req.body.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+      : undefined;
+    const product = await ProductModel.create({
+      ...req.body,
+      supplier_id: supplierId,
+      slug: req.body.slug || slug,
+      is_active: false, // starts pending admin review
+    });
+    res.status(201).json({ data: product });
+  } catch (err) { next(err); }
+};
+
+module.exports = { products, orders, inventory, updateOrderStatus, adjustInventory, submitProduct };

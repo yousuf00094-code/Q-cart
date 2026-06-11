@@ -1,7 +1,7 @@
 'use strict';
 
 const { Router } = require('express');
-const { query: queryValidator } = require('express-validator');
+const { body, param, query: queryValidator } = require('express-validator');
 const ctrl = require('../controllers/supplier_portal.controller');
 const { authenticate, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
@@ -31,6 +31,28 @@ router.get('/inventory',
   queryValidator('low_stock').optional().isBoolean(),
   validate,
   ctrl.inventory
+);
+
+router.patch('/orders/:id/status',
+  param('id').isUUID(),
+  body('status').isIn(['processing', 'out_for_delivery', 'delivered']),
+  validate,
+  ctrl.updateOrderStatus
+);
+
+router.post('/inventory/:productId/adjust',
+  param('productId').isUUID(),
+  body('quantity_delta').isInt(),
+  validate,
+  ctrl.adjustInventory
+);
+
+router.post('/products',
+  body('name').notEmpty(),
+  body('category_id').isUUID(),
+  body('price').isFloat({ min: 0 }),
+  validate,
+  ctrl.submitProduct
 );
 
 module.exports = router;

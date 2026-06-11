@@ -171,9 +171,31 @@ class SupplierService {
 
   static Future<void> adjustInventory(
       String productId, int delta, String reason) async {
-    await ApiClient.post('/inventory/$productId/adjust', {
+    await ApiClient.post('/supplier/inventory/$productId/adjust', {
       'quantity_delta': delta,
       'notes': reason,
     });
+  }
+
+  static Future<Map<String, dynamic>> updateOrderStatus(
+      String orderId, String status) async {
+    final res = await ApiClient.patch('/supplier/orders/$orderId/status', {
+      'status': status,
+    });
+    return res['data'] as Map<String, dynamic>;
+  }
+
+  // ── Categories (for product submission) ──────────────────────────────────
+
+  static Future<List<Map<String, dynamic>>> getCategories() async {
+    final res = await ApiClient.get('/categories');
+    final data = res['data'] as List<dynamic>? ?? [];
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  static Future<Map<String, dynamic>> submitProduct(
+      Map<String, dynamic> data) async {
+    final res = await ApiClient.post('/supplier/products', data);
+    return res['data'] as Map<String, dynamic>;
   }
 }
