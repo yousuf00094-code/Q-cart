@@ -12,6 +12,7 @@ RUN addgroup -S qcart && adduser -S qcart -G qcart
 
 COPY --from=deps --chown=qcart:qcart /app/node_modules ./node_modules
 COPY --chown=qcart:qcart src ./src
+COPY --chown=qcart:qcart scripts ./scripts
 COPY --chown=qcart:qcart package.json ./
 
 USER qcart
@@ -24,4 +25,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD wget -qO- http://localhost:3000/v1/health || exit 1
 
-CMD ["node", "src/server.js"]
+CMD ["sh", "-c", "node scripts/migrate.js && node src/server.js"]

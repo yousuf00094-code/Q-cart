@@ -1,0 +1,23 @@
+name: Backend — Deploy to Render
+
+on:
+  push:
+    branches: [main, claude/repo-file-inventory-we4dk9]
+    paths:
+      - 'backend/nodejs/**'
+      - 'render.yaml'
+      - '.github/workflows/render-deploy.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Trigger Render Deploy
+    runs-on: ubuntu-latest
+    if: ${{ secrets.RENDER_DEPLOY_HOOK_URL != '' }}
+
+    steps:
+      - name: Trigger deploy hook
+        run: |
+          curl -s "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" \
+            -d '' \
+            -w "\nHTTP %{http_code}\n"
