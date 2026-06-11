@@ -16,6 +16,15 @@ router.use('/wishlist',   require('./wishlist.routes'));
 router.use('/coupons',    require('./coupons.routes'));
 router.use('/admin',      require('./admin.routes'));
 
+// ── Supplier-scoped APIs ───────────────────────────────────────────────────
+router.use('/supplier/analytics', require('./supplier_analytics.routes'));
+router.use('/supplier/ratings',   require('./supplier_ratings.routes'));
+router.use('/supplier/payouts',   require('./supplier_payouts.routes'));
+router.use('/supplier/shipments', require('./shipments.routes'));
+
+// ── Admin supplier risk scores ─────────────────────────────────────────────
+router.use('/admin/supplier-risk', require('./supplier_risk.routes'));
+
 router.get('/health', (req, res) =>
   res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.0' })
 );
