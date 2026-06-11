@@ -1,0 +1,82 @@
+{
+  "family": "qcart-api",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/qcart-api-task-role",
+  "containerDefinitions": [
+    {
+      "name": "qcart-api",
+      "image": "ACCOUNT_ID.dkr.ecr.me-south-1.amazonaws.com/qcart-api:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "NODE_ENV",              "value": "production" },
+        { "name": "PORT",                  "value": "3000" },
+        { "name": "JWT_ACCESS_EXPIRY",     "value": "15m" },
+        { "name": "JWT_REFRESH_EXPIRY",    "value": "7d" },
+        { "name": "DB_POOL_MIN",           "value": "2" },
+        { "name": "DB_POOL_MAX",           "value": "10" },
+        { "name": "BCRYPT_ROUNDS",         "value": "12" },
+        { "name": "RATE_LIMIT_MAX",        "value": "300" },
+        { "name": "AUTH_RATE_LIMIT_MAX",   "value": "10" }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:me-south-1:ACCOUNT_ID:secret:qcart/production/database-url"
+        },
+        {
+          "name": "REDIS_URL",
+          "valueFrom": "arn:aws:secretsmanager:me-south-1:ACCOUNT_ID:secret:qcart/production/redis-url"
+        },
+        {
+          "name": "JWT_ACCESS_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:me-south-1:ACCOUNT_ID:secret:qcart/production/jwt-access-secret"
+        },
+        {
+          "name": "JWT_REFRESH_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:me-south-1:ACCOUNT_ID:secret:qcart/production/jwt-refresh-secret"
+        },
+        {
+          "name": "CORS_ORIGINS",
+          "valueFrom": "arn:aws:secretsmanager:me-south-1:ACCOUNT_ID:secret:qcart/production/cors-origins"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/qcart-api",
+          "awslogs-region": "me-south-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:3000/v1/health || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 20
+      },
+      "stopTimeout": 30,
+      "readonlyRootFilesystem": false,
+      "ulimits": [
+        {
+          "name": "nofile",
+          "softLimit": 65536,
+          "hardLimit": 65536
+        }
+      ]
+    }
+  ]
+}
