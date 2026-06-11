@@ -1,5 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/services/locale_service.dart';
+import '../../../core/services/auth_service.dart';
+import '../../../core/services/api_client.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -14,11 +19,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  final _confirmCtrl = TextEditingController();
+  final _confirmPassCtrl = TextEditingController();
+
+  bool _loading = false;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _agreedToTerms = false;
-  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -26,28 +33,60 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
     _passwordCtrl.dispose();
-    _confirmCtrl.dispose();
+    _confirmPassCtrl.dispose();
     super.dispose();
   }
 
-  void _submit() async {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_agreedToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please accept the terms and conditions'),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+      setState(() => _errorMessage = 'Please agree to the Terms & Privacy Policy');
       return;
     }
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 1));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.pop(context);
+
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final res = await ApiClient.post('/auth/register', {
+        'full_name': _nameCtrl.text.trim(),
+        'email': _emailCtrl.text.trim().toLowerCase(),
+        'password': _passwordCtrl.text,
+        if (_phoneCtrl.text.trim().isNotEmpty) 'phone': _phoneCtrl.text.trim(),
+      });
+
+      final data = res['data'] as Map<String, dynamic>?;
+      if (data != null) {
+        final accessToken = data['access_token']?.toString();
+        final user = data['user'] as Map<String, dynamic>?;
+        if (accessToken != null && user != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('qcart_access_token', accessToken);
+          await prefs.setString('qcart_current_user', json.encode(user));
+          ApiClient.setToken(accessToken);
+        }
+      }
+
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/');
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _errorMessage = e.message;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _errorMessage = LocaleService.t('error_generic');
+        });
+      }
+    }
   }
 
   @override
@@ -58,8 +97,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         backgroundColor: AppColors.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18, color: AppColors.textPrimary),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacementNamed(context, '/login');
+            }
+          },
         ),
       ),
       body: SafeArea(
@@ -68,77 +113,168 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Form(
             key: _formKey,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 8),
-                _buildHeader(),
-                const SizedBox(height: 32),
+                Text(
+                  LocaleService.t('create_account'),
+                  style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Fill in the details below to get started',
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                ),
+                const SizedBox(height: 24),
+                if (_errorMessage != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red.shade600, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 _buildField(
-                  controller: _nameCtrl,
-                  label: 'Full Name',
-                  icon: Icons.person_outline,
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+                  _nameCtrl,
+                  LocaleService.t('full_name'),
+                  Icons.person_outline,
+                  required: true,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Full name is required';
+                    if (v.trim().length < 2) return 'Name is too short';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 14),
                 _buildField(
-                  controller: _emailCtrl,
-                  label: 'Email Address',
-                  icon: Icons.email_outlined,
+                  _emailCtrl,
+                  LocaleService.t('email'),
+                  Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
+                  required: true,
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'Email is required';
-                    if (!v.contains('@')) return 'Enter a valid email';
+                    if (v == null || v.trim().isEmpty) return 'Email is required';
+                    if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v.trim())) return 'Enter a valid email';
                     return null;
                   },
                 ),
                 const SizedBox(height: 14),
                 _buildField(
-                  controller: _phoneCtrl,
-                  label: 'Phone Number',
-                  icon: Icons.phone_outlined,
+                  _phoneCtrl,
+                  '${LocaleService.t('phone')} (optional)',
+                  Icons.phone_outlined,
                   keyboardType: TextInputType.phone,
-                  prefix: _PhonePrefix(),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Phone number is required';
-                    if (v.length < 8) return 'Enter a valid phone number';
-                    return null;
-                  },
                 ),
                 const SizedBox(height: 14),
-                _buildPasswordField(
+                TextFormField(
                   controller: _passwordCtrl,
-                  label: 'Password',
-                  obscure: _obscurePassword,
-                  onToggle: () =>
-                      setState(() => _obscurePassword = !_obscurePassword),
+                  obscureText: _obscurePassword,
+                  style: const TextStyle(color: AppColors.textPrimary),
+                  decoration: _inputDeco(LocaleService.t('password'), Icons.lock_outline).copyWith(
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                        color: AppColors.textSecondary,
+                        size: 20,
+                      ),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    ),
+                  ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Password is required';
                     if (v.length < 8) return 'Password must be at least 8 characters';
                     return null;
                   },
                 ),
-                const SizedBox(height: 8),
-                _buildPasswordStrengthIndicator(),
                 const SizedBox(height: 14),
-                _buildPasswordField(
-                  controller: _confirmCtrl,
-                  label: 'Confirm Password',
-                  obscure: _obscureConfirm,
-                  onToggle: () =>
-                      setState(() => _obscureConfirm = !_obscureConfirm),
+                TextFormField(
+                  controller: _confirmPassCtrl,
+                  obscureText: _obscureConfirm,
+                  style: const TextStyle(color: AppColors.textPrimary),
+                  decoration: _inputDeco(LocaleService.t('confirm_password'), Icons.lock_outline).copyWith(
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                        color: AppColors.textSecondary,
+                        size: 20,
+                      ),
+                      onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                    ),
+                  ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Please confirm your password';
                     if (v != _passwordCtrl.text) return 'Passwords do not match';
                     return null;
                   },
                 ),
+                const SizedBox(height: 16),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Checkbox(
+                      value: _agreedToTerms,
+                      onChanged: (v) => setState(() => _agreedToTerms = v ?? false),
+                      activeColor: AppColors.secondary,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _agreedToTerms = !_agreedToTerms),
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            LocaleService.t('agree_terms'),
+                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 20),
-                _buildTermsRow(),
-                const SizedBox(height: 28),
-                _buildRegisterButton(),
+                ElevatedButton(
+                  onPressed: _loading ? null : _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.secondary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    disabledBackgroundColor: AppColors.secondary.withOpacity(0.6),
+                  ),
+                  child: _loading
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Text(LocaleService.t('create_account'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
                 const SizedBox(height: 20),
-                _buildLoginLink(context),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(LocaleService.t('already_account'), style: const TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                    GestureDetector(
+                      onTap: () => Navigator.pushReplacementNamed(context, '/login'),
+                      child: Text(
+                        LocaleService.t('sign_in'),
+                        style: const TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 32),
               ],
             ),
@@ -148,250 +284,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _buildHeader() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Create Account',
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Join Q Cart for the best shopping experience in Qatar',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    TextInputType? keyboardType,
-    Widget? prefix,
+  Widget _buildField(
+    TextEditingController ctrl,
+    String label,
+    IconData icon, {
+    bool required = false,
+    TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
-      controller: controller,
+      controller: ctrl,
       keyboardType: keyboardType,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: prefix ?? Icon(icon, color: AppColors.textSecondary),
-      ),
-      validator: validator,
+      style: const TextStyle(color: AppColors.textPrimary),
+      decoration: _inputDeco(label, icon),
+      validator: validator ?? (required ? (v) => (v == null || v.trim().isEmpty) ? 'Required' : null : null),
     );
   }
 
-  Widget _buildPasswordField({
-    required TextEditingController controller,
-    required String label,
-    required bool obscure,
-    required VoidCallback onToggle,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      obscureText: obscure,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon:
-            const Icon(Icons.lock_outline, color: AppColors.textSecondary),
-        suffixIcon: IconButton(
-          icon: Icon(
-            obscure
-                ? Icons.visibility_off_outlined
-                : Icons.visibility_outlined,
-            color: AppColors.textSecondary,
-          ),
-          onPressed: onToggle,
-        ),
-      ),
-      validator: validator,
-    );
-  }
-
-  Widget _buildPasswordStrengthIndicator() {
-    final password = _passwordCtrl.text;
-    int strength = 0;
-    if (password.length >= 8) strength++;
-    if (password.contains(RegExp(r'[A-Z]'))) strength++;
-    if (password.contains(RegExp(r'[0-9]'))) strength++;
-    if (password.contains(RegExp(r'[!@#\$%^&*]'))) strength++;
-
-    final labels = ['', 'Weak', 'Fair', 'Good', 'Strong'];
-    final colors = [
-      Colors.transparent,
-      Colors.redAccent,
-      Colors.orange,
-      Colors.amber,
-      const Color(0xFF2ECC71),
-    ];
-
-    if (password.isEmpty) return const SizedBox.shrink();
-
-    return Row(
-      children: [
-        ...List.generate(4, (i) => Expanded(
-              child: Container(
-                height: 4,
-                margin: EdgeInsets.only(right: i < 3 ? 4 : 0),
-                decoration: BoxDecoration(
-                  color: i < strength ? colors[strength] : AppColors.divider,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            )),
-        const SizedBox(width: 8),
-        Text(
-          labels[strength],
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: colors[strength],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTermsRow() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 20,
-          height: 20,
-          child: Checkbox(
-            value: _agreedToTerms,
-            onChanged: (v) => setState(() => _agreedToTerms = v ?? false),
-            activeColor: AppColors.secondary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: RichText(
-            text: const TextSpan(children: [
-              TextSpan(
-                text: 'I agree to the ',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
-              TextSpan(
-                text: 'Terms of Service',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.secondary,
-                ),
-              ),
-              TextSpan(
-                text: ' and ',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
-              TextSpan(
-                text: 'Privacy Policy',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.secondary,
-                ),
-              ),
-            ]),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRegisterButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : _submit,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.secondary,
-          foregroundColor: Colors.white,
-          disabledBackgroundColor: AppColors.secondary.withOpacity(0.6),
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          elevation: 0,
-        ),
-        child: _isLoading
-            ? const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : const Text(
-                'Create Account',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-              ),
-      ),
-    );
-  }
-
-  Widget _buildLoginLink(BuildContext context) {
-    return Center(
-      child: GestureDetector(
-        onTap: () => Navigator.pop(context),
-        child: RichText(
-          text: const TextSpan(children: [
-            TextSpan(
-              text: 'Already have an account? ',
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-            ),
-            TextSpan(
-              text: 'Login',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: AppColors.secondary,
-              ),
-            ),
-          ]),
-        ),
-      ),
-    );
-  }
-}
-
-class _PhonePrefix extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('🇶🇦', style: TextStyle(fontSize: 16)),
-          const SizedBox(width: 4),
-          const Text(
-            '+974',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 20,
-            margin: const EdgeInsets.only(left: 8),
-            color: AppColors.divider,
-          ),
-        ],
-      ),
+  InputDecoration _inputDeco(String label, IconData icon) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+      prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
+      filled: true,
+      fillColor: AppColors.surface,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.divider)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.divider)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.secondary, width: 1.5)),
+      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.red.shade400)),
+      focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.red.shade400, width: 1.5)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     );
   }
 }
