@@ -144,7 +144,7 @@ class _AdminSupplierPerformanceScreenState
   }
 
   List<_SupplierPerf> get _sortedSuppliers {
-    final list = [...(_suppliers ?? [])];
+    final list = <_SupplierPerf>[...(_suppliers ?? [])];
     list.sort((a, b) {
       return switch (_sortBy) {
         'rating' => b.rating.compareTo(a.rating),
