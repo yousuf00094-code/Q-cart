@@ -11,13 +11,16 @@ const findBySlug = async (slug) => {
 };
 
 const listRoots = async (includeInactive = false) => {
-  const where = includeInactive ? '' : 'WHERE c.is_active = TRUE';
+  const conditions = ['c.parent_id IS NULL'];
+  if (!includeInactive) conditions.push('c.is_active = TRUE');
+  const where = `WHERE ${conditions.join(' AND ')}`;
+
   const { rows } = await query(
     `SELECT c.*,
             COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = TRUE) AS product_count
        FROM categories c
        LEFT JOIN products p ON p.category_id = c.id
-       ${where} AND c.parent_id IS NULL
+       ${where}
      GROUP BY c.id
      ORDER BY c.sort_order, c.name`
   );

@@ -50,9 +50,10 @@ const refresh = async (refreshToken) => {
     throw new AppError('Invalid or expired refresh token.', 401, 'UNAUTHORIZED');
   }
 
-  const user = await UserModel.findByEmail(
-    (await require('../config/database').query('SELECT email FROM users WHERE id = $1', [payload.sub])).rows[0]?.email
+  const { rows: userRows } = await require('../config/database').query(
+    'SELECT * FROM users WHERE id = $1', [payload.sub]
   );
+  const user = userRows[0];
   if (!user || !user.refresh_token_hash) throw new AppError('Session invalidated.', 401, 'UNAUTHORIZED');
 
   const valid = await bcrypt.compare(refreshToken, user.refresh_token_hash);
