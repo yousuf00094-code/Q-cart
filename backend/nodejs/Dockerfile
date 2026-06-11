@@ -17,12 +17,12 @@ COPY --chown=qcart:qcart package.json ./
 
 USER qcart
 
-ENV NODE_ENV=production \
-    PORT=3000
+ENV NODE_ENV=production
 
-EXPOSE 3000
+# PORT is injected at runtime by the hosting platform (Render: 10000, local: 3000)
+EXPOSE 10000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD wget -qO- http://localhost:3000/v1/health || exit 1
+  CMD wget -qO- http://localhost:${PORT:-3000}/v1/health || exit 1
 
 CMD ["sh", "-c", "node scripts/migrate.js && node src/server.js"]
