@@ -1,115 +1,159 @@
 import 'package:flutter/material.dart';
-import '../../product/presentation/product_details_screen.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/services/customer_service.dart';
+import '../../../core/services/api_client.dart';
+import '../../../core/services/locale_service.dart';
+import '../../products/presentation/product_listing_screen.dart';
 
-class CategoriesScreen extends StatelessWidget {
+class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
 
-  static const List<_CategoryItem> _items = [
-    _CategoryItem(
-      label: 'Groceries',
-      icon: Icons.local_grocery_store_outlined,
-      color: Color(0xFFD4F5E9),
-      count: 128,
-    ),
-    _CategoryItem(
-      label: 'Electronics',
-      icon: Icons.devices_outlined,
-      color: Color(0xFFDDD9F5),
-      count: 64,
-    ),
-    _CategoryItem(
-      label: 'Fashion',
-      icon: Icons.checkroom_outlined,
-      color: Color(0xFFFFE8D6),
-      count: 215,
-    ),
-    _CategoryItem(
-      label: 'Home & Living',
-      icon: Icons.home_outlined,
-      color: Color(0xFFD6EEFF),
-      count: 97,
-    ),
-    _CategoryItem(
-      label: 'Sports',
-      icon: Icons.sports_soccer_outlined,
-      color: Color(0xFFFFEDD6),
-      count: 43,
-    ),
-    _CategoryItem(
-      label: 'Beauty',
-      icon: Icons.face_retouching_natural_outlined,
-      color: Color(0xFFFFD6E8),
-      count: 76,
-    ),
-    _CategoryItem(
-      label: 'Books',
-      icon: Icons.menu_book_outlined,
-      color: Color(0xFFD6F5FF),
-      count: 150,
-    ),
-    _CategoryItem(
-      label: 'Toys',
-      icon: Icons.toys_outlined,
-      color: Color(0xFFF5F0D6),
-      count: 59,
-    ),
-    _CategoryItem(
-      label: 'Automotive',
-      icon: Icons.directions_car_outlined,
-      color: Color(0xFFE8D6FF),
-      count: 32,
-    ),
-    _CategoryItem(
-      label: 'Health',
-      icon: Icons.health_and_safety_outlined,
-      color: Color(0xFFD6FFE8),
-      count: 88,
-    ),
-    _CategoryItem(
-      label: 'Garden',
-      icon: Icons.yard_outlined,
-      color: Color(0xFFE8FFD6),
-      count: 41,
-    ),
-    _CategoryItem(
-      label: 'Pets',
-      icon: Icons.pets_outlined,
-      color: Color(0xFFFFD6D6),
-      count: 55,
-    ),
+  @override
+  State<CategoriesScreen> createState() => _CategoriesScreenState();
+}
+
+class _CategoriesScreenState extends State<CategoriesScreen> {
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _categories = [];
+
+  static const List<Color> _colors = [
+    Color(0xFFD4F5E9),
+    Color(0xFFDDD9F5),
+    Color(0xFFFFE8D6),
+    Color(0xFFD6EEFF),
+    Color(0xFFFFEDD6),
+    Color(0xFFFFD6E8),
+    Color(0xFFD6F5FF),
+    Color(0xFFF5F0D6),
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _fetchCategories();
+  }
+
+  Future<void> _fetchCategories() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final data = await CustomerService.getCategories();
+      if (mounted) {
+        setState(() {
+          _categories = data;
+          _loading = false;
+        });
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = LocaleService.t('error_generic');
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        title: const Text(
-          'Categories',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
+    return ValueListenableBuilder<Locale>(
+      valueListenable: LocaleService.localeNotifier,
+      builder: (context, _, __) {
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            backgroundColor: AppColors.background,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            title: Text(
+              LocaleService.t('categories'),
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            actions: [
+              IconButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ProductListingScreen(),
+                  ),
+                ),
+                icon: const Icon(Icons.search, color: AppColors.textPrimary),
+              ),
+              const SizedBox(width: 4),
+            ],
+          ),
+          body: _buildBody(context),
+        );
+      },
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.secondary),
+      );
+    }
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: AppColors.textSecondary),
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: _fetchCategories,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: Text(LocaleService.t('retry')),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.secondary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+              ),
+            ],
           ),
         ),
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.search, color: AppColors.textPrimary),
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      body: Column(
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _fetchCategories,
+      color: AppColors.secondary,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
             child: Text(
-              '${_items.length} Categories Available',
+              '${_categories.length} ${LocaleService.t('categories')}',
               style: const TextStyle(
                 fontSize: 13,
                 color: AppColors.textSecondary,
@@ -125,9 +169,26 @@ class CategoriesScreen extends StatelessWidget {
                 crossAxisSpacing: 14,
                 childAspectRatio: 1.1,
               ),
-              itemCount: _items.length,
-              itemBuilder: (context, index) =>
-                  _CategoryCard(item: _items[index]),
+              itemCount: _categories.length,
+              itemBuilder: (context, index) {
+                final cat = _categories[index];
+                final color = _colors[index % _colors.length];
+                final productCount = cat['product_count'] as int?;
+                return _CategoryCard(
+                  label: cat['name']?.toString() ?? '',
+                  color: color,
+                  productCount: productCount,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProductListingScreen(
+                        categoryId: cat['id']?.toString(),
+                        categoryName: cat['name']?.toString(),
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -137,22 +198,25 @@ class CategoriesScreen extends StatelessWidget {
 }
 
 class _CategoryCard extends StatelessWidget {
-  const _CategoryCard({required this.item});
+  const _CategoryCard({
+    required this.label,
+    required this.color,
+    required this.onTap,
+    this.productCount,
+  });
 
-  final _CategoryItem item;
+  final String label;
+  final Color color;
+  final int? productCount;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ProductDetailsScreen(categoryName: item.label),
-        ),
-      ),
+      onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: item.color,
+          color: color,
           borderRadius: BorderRadius.circular(20),
         ),
         padding: const EdgeInsets.all(16),
@@ -167,27 +231,35 @@ class _CategoryCard extends StatelessWidget {
                 color: Colors.white.withOpacity(0.6),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(item.icon, color: AppColors.secondary, size: 26),
+              child: const Icon(
+                Icons.category_outlined,
+                color: AppColors.secondary,
+                size: 26,
+              ),
             ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.label,
+                  label,
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${item.count} items',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+                if (productCount != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    '$productCount items',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ],
@@ -195,18 +267,4 @@ class _CategoryCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _CategoryItem {
-  final String label;
-  final IconData icon;
-  final Color color;
-  final int count;
-
-  const _CategoryItem({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.count,
-  });
 }
