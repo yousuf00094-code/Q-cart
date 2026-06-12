@@ -122,6 +122,66 @@ class _HomeScreenState extends State<HomeScreen> {
     return result;
   }
 
+  Widget _buildDebugBar(String section, bool loading, String? error, int count) {
+    final Color bg;
+    final String statusLine;
+    final String? detailLine;
+
+    if (loading) {
+      bg = const Color(0xFFE3F2FD);
+      statusLine = 'Status: Loading...';
+      detailLine = null;
+    } else if (error != null) {
+      bg = const Color(0xFFFFEBEE);
+      statusLine = 'Status: Error';
+      detailLine = 'Message: $error';
+    } else if (count == 0) {
+      bg = const Color(0xFFFFF8E1);
+      statusLine = 'Status: Loaded';
+      detailLine = 'Products: 0 — no active products returned';
+    } else {
+      bg = const Color(0xFFE8F5E9);
+      statusLine = 'Status: Loaded';
+      detailLine = 'Products: $count';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: bg.withValues(alpha: 0.8)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$section Debug',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF444444),
+                fontFamily: 'monospace',
+              ),
+            ),
+            Text(
+              statusLine,
+              style: const TextStyle(fontSize: 12, color: Color(0xFF222222), fontFamily: 'monospace'),
+            ),
+            if (detailLine != null)
+              Text(
+                detailLine,
+                style: const TextStyle(fontSize: 12, color: Color(0xFF222222), fontFamily: 'monospace'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _onRefresh() async {
     await Future.wait([
       _fetchCategories(),
@@ -166,7 +226,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const ProductListingScreen())),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 6),
+                  _buildDebugBar('Best Selling', _bestSellingLoading, _bestSellingError, _bestSelling.length),
+                  const SizedBox(height: 6),
                   _buildProductRow(
                     context,
                     items: _bestSelling,
@@ -181,7 +243,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const ProductListingScreen())),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 6),
+                  _buildDebugBar('Featured Products', _featuredLoading, _featuredError, _featured.length),
+                  const SizedBox(height: 6),
                   _buildProductRow(
                     context,
                     items: _featured,
