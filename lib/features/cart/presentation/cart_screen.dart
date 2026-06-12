@@ -424,12 +424,14 @@ class _CartScreenState extends State<CartScreen> {
                 final itemId = item['id']?.toString() ?? '';
                 final product = item['product']
                     as Map<String, dynamic>?;
-                final images = (product?['images'] as List<dynamic>?)
-                    ?.cast<Map<String, dynamic>>();
-                final imageUrl =
-                    images != null && images.isNotEmpty
-                        ? images.first['url'] as String?
-                        : null;
+                final rawImages = product?['images'] as List<dynamic>? ?? [];
+                final imageUrl = rawImages.isNotEmpty
+                    ? (rawImages.first is String
+                        ? rawImages.first as String
+                        : rawImages.first is Map
+                            ? rawImages.first['url']?.toString()
+                            : null)
+                    : null;
                 final name =
                     (product?['name'] as String?) ?? '';
                 final price =

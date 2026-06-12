@@ -56,10 +56,10 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
       final ratingSummary = results[4] as Map<String, dynamic>;
 
       // Map KPIs — analytics endpoint nests data under 'kpis'
-      final kpis = dashboard['kpis'] as Map<String, dynamic>? ?? {};
-      final revenueMtd = kpis['revenue_mtd'];
-      final totalOrders = kpis['total_orders'];
-      final activeProducts = kpis['active_products'];
+      final kpisMap = dashboard['kpis'] as Map<String, dynamic>? ?? {};
+      final revenueMtd = kpisMap['revenue_mtd'];
+      final totalOrders = kpisMap['total_orders'];
+      final activeProducts = kpisMap['active_products'];
       final avgRating = ratingSummary['avg_rating'];
 
       final kpis = [
@@ -146,14 +146,14 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
 
   String _formatAmount(dynamic value) {
     if (value == null) return '0';
-    final num = (value as num).toDouble();
-    if (num >= 1000) {
-      return num.toStringAsFixed(0).replaceAllMapped(
+    final val = (value as num).toDouble();
+    if (val >= 1000) {
+      return val.toStringAsFixed(0).replaceAllMapped(
         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
         (m) => '${m[1]},',
       );
     }
-    return num.toStringAsFixed(2);
+    return val.toStringAsFixed(2);
   }
 
   String _formatRating(dynamic value) {

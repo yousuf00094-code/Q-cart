@@ -17,13 +17,16 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _categoriesLoading = true;
+  bool _featuredLoading = true;
   bool _bestSellingLoading = true;
   bool _newArrivalsLoading = true;
   String? _categoriesError;
+  String? _featuredError;
   String? _bestSellingError;
   String? _newArrivalsError;
 
   List<Map<String, dynamic>> _categories = [];
+  List<Map<String, dynamic>> _featured = [];
   List<Map<String, dynamic>> _bestSelling = [];
   List<Map<String, dynamic>> _newArrivals = [];
 
@@ -31,105 +34,66 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _fetchCategories();
+    _fetchFeatured();
     _fetchBestSelling();
     _fetchNewArrivals();
   }
 
   Future<void> _fetchCategories() async {
-    setState(() {
-      _categoriesLoading = true;
-      _categoriesError = null;
-    });
+    setState(() { _categoriesLoading = true; _categoriesError = null; });
     try {
       final data = await CustomerService.getCategories();
-      if (mounted) {
-        setState(() {
-          _categories = data;
-          _categoriesLoading = false;
-        });
-      }
+      if (mounted) setState(() { _categories = data; _categoriesLoading = false; });
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _categoriesError = e.message;
-          _categoriesLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _categoriesError = LocaleService.t('error_generic');
-          _categoriesLoading = false;
-        });
-      }
+      if (mounted) setState(() { _categoriesError = e.message; _categoriesLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() { _categoriesError = LocaleService.t('error_generic'); _categoriesLoading = false; });
+    }
+  }
+
+  Future<void> _fetchFeatured() async {
+    setState(() { _featuredLoading = true; _featuredError = null; });
+    try {
+      final res = await CustomerService.getProducts(featured: true, limit: 6);
+      final data = (res['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+      if (mounted) setState(() { _featured = data; _featuredLoading = false; });
+    } on ApiException catch (e) {
+      if (mounted) setState(() { _featuredError = e.message; _featuredLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() { _featuredError = LocaleService.t('error_generic'); _featuredLoading = false; });
     }
   }
 
   Future<void> _fetchBestSelling() async {
-    setState(() {
-      _bestSellingLoading = true;
-      _bestSellingError = null;
-    });
+    setState(() { _bestSellingLoading = true; _bestSellingError = null; });
     try {
       final res = await CustomerService.getProducts(sort: 'best_seller', limit: 6);
       final data = (res['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
-      if (mounted) {
-        setState(() {
-          _bestSelling = data;
-          _bestSellingLoading = false;
-        });
-      }
+      if (mounted) setState(() { _bestSelling = data; _bestSellingLoading = false; });
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _bestSellingError = e.message;
-          _bestSellingLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _bestSellingError = LocaleService.t('error_generic');
-          _bestSellingLoading = false;
-        });
-      }
+      if (mounted) setState(() { _bestSellingError = e.message; _bestSellingLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() { _bestSellingError = LocaleService.t('error_generic'); _bestSellingLoading = false; });
     }
   }
 
   Future<void> _fetchNewArrivals() async {
-    setState(() {
-      _newArrivalsLoading = true;
-      _newArrivalsError = null;
-    });
+    setState(() { _newArrivalsLoading = true; _newArrivalsError = null; });
     try {
       final res = await CustomerService.getProducts(sort: 'newest', limit: 8);
       final data = (res['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
-      if (mounted) {
-        setState(() {
-          _newArrivals = data;
-          _newArrivalsLoading = false;
-        });
-      }
+      if (mounted) setState(() { _newArrivals = data; _newArrivalsLoading = false; });
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _newArrivalsError = e.message;
-          _newArrivalsLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _newArrivalsError = LocaleService.t('error_generic');
-          _newArrivalsLoading = false;
-        });
-      }
+      if (mounted) setState(() { _newArrivalsError = e.message; _newArrivalsLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() { _newArrivalsError = LocaleService.t('error_generic'); _newArrivalsLoading = false; });
     }
   }
 
   Future<void> _onRefresh() async {
     await Future.wait([
       _fetchCategories(),
+      _fetchFeatured(),
       _fetchBestSelling(),
       _fetchNewArrivals(),
     ]);
@@ -167,25 +131,38 @@ class _HomeScreenState extends State<HomeScreen> {
                   _buildSectionHeader(
                     context,
                     LocaleService.t('best_selling'),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ProductListingScreen(),
-                      ),
-                    ),
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const ProductListingScreen())),
                   ),
                   const SizedBox(height: 12),
-                  _buildBestSellingRow(context),
+                  _buildProductRow(
+                    context,
+                    items: _bestSelling,
+                    loading: _bestSellingLoading,
+                    error: _bestSellingError,
+                    onRetry: _fetchBestSelling,
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSectionHeader(
+                    context,
+                    LocaleService.t('featured_products'),
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const ProductListingScreen())),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildProductRow(
+                    context,
+                    items: _featured,
+                    loading: _featuredLoading,
+                    error: _featuredError,
+                    onRetry: _fetchFeatured,
+                  ),
                   const SizedBox(height: 24),
                   _buildSectionHeader(
                     context,
                     LocaleService.t('new_arrivals'),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ProductListingScreen(),
-                      ),
-                    ),
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const ProductListingScreen())),
                   ),
                   const SizedBox(height: 12),
                   _buildNewArrivalsGrid(context),
@@ -449,6 +426,7 @@ class _HomeScreenState extends State<HomeScreen> {
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           final cat = displayCategories[index];
+          final imageUrl = cat['image_url']?.toString();
           return GestureDetector(
             onTap: () => Navigator.push(
               context,
@@ -469,11 +447,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppColors.divider),
                   ),
-                  child: const Icon(
-                    Icons.category_outlined,
-                    color: AppColors.secondary,
-                    size: 26,
-                  ),
+                  child: imageUrl != null && imageUrl.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(15),
+                          child: Image.network(imageUrl, fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.category_outlined,
+                                    color: AppColors.secondary,
+                                    size: 26,
+                                  )),
+                        )
+                      : const Icon(
+                          Icons.category_outlined,
+                          color: AppColors.secondary,
+                          size: 26,
+                        ),
                 ),
                 const SizedBox(height: 6),
                 SizedBox(
@@ -498,28 +486,30 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildBestSellingRow(BuildContext context) {
-    if (_bestSellingLoading) {
+  Widget _buildProductRow(
+    BuildContext context, {
+    required List<Map<String, dynamic>> items,
+    required bool loading,
+    required String? error,
+    required VoidCallback onRetry,
+  }) {
+    if (loading) {
       return const SizedBox(
         height: 210,
         child: Center(child: CircularProgressIndicator(color: AppColors.secondary)),
       );
     }
-    if (_bestSellingError != null) {
+    if (error != null) {
       return SizedBox(
         height: 210,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                _bestSellingError!,
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                textAlign: TextAlign.center,
-              ),
+              Text(error, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13), textAlign: TextAlign.center),
               const SizedBox(height: 8),
               TextButton.icon(
-                onPressed: _fetchBestSelling,
+                onPressed: onRetry,
                 icon: const Icon(Icons.refresh, size: 16),
                 label: Text(LocaleService.t('retry')),
                 style: TextButton.styleFrom(foregroundColor: AppColors.secondary),
@@ -529,14 +519,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-    if (_bestSelling.isEmpty) {
+    if (items.isEmpty) {
       return SizedBox(
         height: 210,
         child: Center(
-          child: Text(
-            LocaleService.t('no_products'),
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-          ),
+          child: Text(LocaleService.t('no_products'),
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
         ),
       );
     }
@@ -545,15 +533,15 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
-        itemCount: _bestSelling.length,
+        itemCount: items.length,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) => _ProductCard(
-          product: _bestSelling[index],
+          product: items[index],
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => ProductDetailsScreen(
-                productId: _bestSelling[index]['id']?.toString(),
+                productId: items[index]['id']?.toString(),
               ),
             ),
           ),
@@ -630,6 +618,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+String? _extractImageUrl(Map<String, dynamic> product) {
+  final raw = product['images'];
+  if (raw is! List || raw.isEmpty) return null;
+  final first = raw[0];
+  if (first is String && first.isNotEmpty) return first;
+  if (first is Map) return first['url']?.toString();
+  return null;
+}
+
 class _ProductCard extends StatelessWidget {
   const _ProductCard({
     required this.product,
@@ -644,6 +641,7 @@ class _ProductCard extends StatelessWidget {
     final name = product['name']?.toString() ?? '';
     final price = (product['price'] as num?)?.toDouble() ?? 0.0;
     final priceStr = '${LocaleService.t('qar')} ${price.toStringAsFixed(2)}';
+    final imageUrl = _extractImageUrl(product);
 
     return GestureDetector(
       onTap: onTap,
@@ -659,48 +657,41 @@ class _ProductCard extends StatelessWidget {
           children: [
             Stack(
               children: [
-                Container(
-                  height: 110,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFD4F5E9), AppColors.primary],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.shopping_basket_outlined,
-                      size: 44,
-                      color: AppColors.secondary,
-                    ),
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: SizedBox(
+                    height: 110,
+                    width: double.infinity,
+                    child: imageUrl != null
+                        ? Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _placeholder(),
+                          )
+                        : _placeholder(),
                   ),
                 ),
                 Positioned(
                   top: 8,
                   right: 8,
-                  child: GestureDetector(
-                    onTap: () {},
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.favorite_border,
-                        size: 16,
-                        color: AppColors.textSecondary,
-                      ),
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.favorite_border,
+                      size: 16,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -733,17 +724,14 @@ class _ProductCard extends StatelessWidget {
                           color: AppColors.secondary,
                         ),
                       ),
-                      GestureDetector(
-                        onTap: () {},
-                        child: Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: AppColors.secondary,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.add, color: Colors.white, size: 16),
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary,
+                          borderRadius: BorderRadius.circular(8),
                         ),
+                        child: const Icon(Icons.add, color: Colors.white, size: 16),
                       ),
                     ],
                   ),
@@ -751,6 +739,25 @@ class _ProductCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _placeholder() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFD4F5E9), AppColors.primary],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.shopping_basket_outlined,
+          size: 44,
+          color: AppColors.secondary,
         ),
       ),
     );

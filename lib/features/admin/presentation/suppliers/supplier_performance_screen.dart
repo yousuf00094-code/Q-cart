@@ -42,7 +42,7 @@ class _AdminSupplierPerformanceScreenState
       if (!mounted) return;
       final data = res['data'] as List<dynamic>? ?? [];
       setState(() {
-        _suppliers = data.map((r) {
+        _suppliers = data.map<_SupplierPerf>((r) {
           final m = r as Map<String, dynamic>;
           final rating = double.tryParse(m['avg_rating']?.toString() ?? '0') ?? 0;
           final fulfillment = double.tryParse(m['fulfillment_rate']?.toString() ?? '0') ?? 0;
@@ -144,7 +144,7 @@ class _AdminSupplierPerformanceScreenState
   }
 
   List<_SupplierPerf> get _sortedSuppliers {
-    final list = [...(_suppliers ?? [])];
+    final list = <_SupplierPerf>[...(_suppliers ?? <_SupplierPerf>[])];
     list.sort((a, b) {
       return switch (_sortBy) {
         'rating' => b.rating.compareTo(a.rating),
