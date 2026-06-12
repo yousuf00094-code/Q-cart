@@ -49,7 +49,13 @@ class CustomerShellState extends State<CustomerShell> {
 
   @override
   Widget build(BuildContext context) {
-    final lang = LocaleService.code;
+    return ValueListenableBuilder<Locale>(
+      valueListenable: LocaleService.localeNotifier,
+      builder: (context, _, __) => _buildShell(context),
+    );
+  }
+
+  Widget _buildShell(BuildContext context) {
     return Scaffold(
       body: IndexedStack(index: _index, children: _screens),
       bottomNavigationBar: BottomNavigationBar(

@@ -105,7 +105,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(LocaleService.t('cancel_order')),
-        content: const Text('Are you sure you want to cancel this order?'),
+        content: Text(LocaleService.t('cancel_confirm_msg')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -239,7 +239,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(color: AppColors.divider),
                                 ),
-                                child: const Icon(Icons.inventory_2_outlined, color: AppColors.textSecondary, size: 20),
+                                child: _productThumb(product),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -247,12 +247,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(name, style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500)),
-                                    Text('Qty: $qty', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                                    Text('${LocaleService.t('qty')}: $qty', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
                                   ],
                                 ),
                               ),
                               Text(
-                                'QAR ${(price * qty).toStringAsFixed(2)}',
+                                '${LocaleService.t('qar')} ${(price * qty).toStringAsFixed(2)}',
                                 style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
                               ),
                             ],
@@ -287,16 +287,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             title: LocaleService.t('order_summary'),
             child: Column(
               children: [
-                _summaryRow(LocaleService.t('subtotal'), 'QAR ${subtotal.toStringAsFixed(2)}'),
+                _summaryRow(LocaleService.t('subtotal'), '${LocaleService.t('qar')} ${subtotal.toStringAsFixed(2)}'),
                 const SizedBox(height: 8),
                 _summaryRow(
                   LocaleService.t('delivery'),
-                  delivery == 0 ? LocaleService.t('free') : 'QAR ${delivery.toStringAsFixed(2)}',
+                  delivery == 0 ? LocaleService.t('free') : '${LocaleService.t('qar')} ${delivery.toStringAsFixed(2)}',
                 ),
                 const Divider(color: AppColors.divider, height: 20),
                 _summaryRow(
                   LocaleService.t('total'),
-                  'QAR ${total.toStringAsFixed(2)}',
+                  '${LocaleService.t('qar')} ${total.toStringAsFixed(2)}',
                   isBold: true,
                   valueColor: AppColors.secondary,
                 ),
@@ -457,6 +457,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         );
       }),
     );
+  }
+
+  Widget _productThumb(Map<String, dynamic>? product) {
+    final raw = product?['images'] as List<dynamic>? ?? [];
+    String? url;
+    if (raw.isNotEmpty) {
+      final first = raw.first;
+      if (first is String && first.isNotEmpty) url = first;
+      else if (first is Map) url = first['url']?.toString();
+    }
+    if (url != null && url.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(url, fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const Icon(Icons.inventory_2_outlined, color: AppColors.textSecondary, size: 20)),
+      );
+    }
+    return const Icon(Icons.inventory_2_outlined, color: AppColors.textSecondary, size: 20);
   }
 
   Widget _summaryRow(String label, String value, {bool isBold = false, Color? valueColor}) {

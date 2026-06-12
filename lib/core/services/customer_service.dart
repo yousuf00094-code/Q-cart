@@ -2,13 +2,12 @@ import 'api_client.dart';
 
 class CustomerService {
   // ── Sort key mapping ──────────────────────────────────────────────────────
-  // Frontend uses readable keys; backend orderMap uses these exact values.
   static String _mapSort(String sort) {
     switch (sort) {
       case 'best_seller': return 'sold_desc';
       case 'newest':      return 'created_at_desc';
       case 'top_rated':   return 'rating_desc';
-      default:            return sort; // price_asc, price_desc pass through
+      default:            return sort;
     }
   }
 

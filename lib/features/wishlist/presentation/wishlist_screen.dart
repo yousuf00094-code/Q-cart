@@ -326,12 +326,14 @@ class _WishlistItemCardState
     final name = (product?['name'] as String?) ?? '';
     final price =
         (product?['price'] as num?)?.toDouble() ?? 0.0;
-    final images = (product?['images'] as List<dynamic>?)
-        ?.cast<Map<String, dynamic>>();
-    final imageUrl =
-        images != null && images.isNotEmpty
-            ? images.first['url'] as String?
-            : null;
+    final rawImages = product?['images'] as List<dynamic>? ?? [];
+    final imageUrl = rawImages.isNotEmpty
+        ? (rawImages.first is String
+            ? rawImages.first as String
+            : rawImages.first is Map
+                ? rawImages.first['url']?.toString()
+                : null)
+        : null;
 
     return GestureDetector(
       onTap: widget.onTap,

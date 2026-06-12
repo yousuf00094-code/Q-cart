@@ -157,7 +157,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _placeOrder() async {
     if (_selectedAddressId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a delivery address.')),
+        SnackBar(content: Text(LocaleService.t('select_address_hint'))),
       );
       return;
     }
@@ -409,14 +409,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           value: 'cash_on_delivery',
           icon: Icons.payments_outlined,
           title: LocaleService.t('cash_on_delivery'),
-          subtitle: 'Pay when your order arrives',
+          subtitle: LocaleService.t('cod_subtitle'),
         ),
         const SizedBox(height: 10),
         _paymentOption(
           value: 'qpay',
           icon: Icons.qr_code_scanner,
           title: LocaleService.t('pay_with_qpay'),
-          subtitle: 'Secure card / wallet payment via QPay',
+          subtitle: LocaleService.t('qpay_subtitle'),
         ),
       ],
     );
@@ -516,7 +516,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                   ),
                   Text(
-                    'QAR ${(price * qty).toStringAsFixed(2)}',
+                    '${LocaleService.t('qar')} ${(price * qty).toStringAsFixed(2)}',
                     style: const TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 13,
@@ -528,24 +528,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             );
           }),
           if (_cartItems.isNotEmpty) const Divider(color: AppColors.divider),
-          _summaryRow(LocaleService.t('subtotal'), 'QAR ${_subtotal.toStringAsFixed(2)}'),
+          _summaryRow(LocaleService.t('subtotal'), '${LocaleService.t('qar')} ${_subtotal.toStringAsFixed(2)}'),
           const SizedBox(height: 6),
           _summaryRow(
             LocaleService.t('delivery'),
-            _delivery == 0 ? LocaleService.t('free') : 'QAR ${_delivery.toStringAsFixed(2)}',
+            _delivery == 0 ? LocaleService.t('free') : '${LocaleService.t('qar')} ${_delivery.toStringAsFixed(2)}',
           ),
           if (_discountAmount > 0) ...[
             const SizedBox(height: 6),
             _summaryRow(
               LocaleService.t('discount'),
-              '- QAR ${_discountAmount.toStringAsFixed(2)}',
+              '- ${LocaleService.t('qar')} ${_discountAmount.toStringAsFixed(2)}',
               valueColor: Colors.green.shade600,
             ),
           ],
           const Divider(color: AppColors.divider),
           _summaryRow(
             LocaleService.t('total'),
-            'QAR ${_total.toStringAsFixed(2)}',
+            '${LocaleService.t('qar')} ${_total.toStringAsFixed(2)}',
             isBold: true,
             valueColor: AppColors.secondary,
           ),
@@ -601,7 +601,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
               ),
               Text(
-                'QAR ${_total.toStringAsFixed(2)}',
+                '${LocaleService.t('qar')} ${_total.toStringAsFixed(2)}',
                 style: const TextStyle(
                   color: AppColors.secondary,
                   fontSize: 18,
@@ -700,7 +700,7 @@ class _AddAddressSheetState extends State<_AddAddressSheet> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
       validator: required
-          ? (v) => (v == null || v.trim().isEmpty) ? 'Required' : null
+          ? (v) => (v == null || v.trim().isEmpty) ? LocaleService.t('error_generic') : null
           : null,
     );
   }
@@ -758,17 +758,17 @@ class _AddAddressSheetState extends State<_AddAddressSheet> {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  Expanded(child: _field(widget.firstNameCtrl, 'First Name', required: true)),
+                  Expanded(child: _field(widget.firstNameCtrl, LocaleService.t('first_name'), required: true)),
                   const SizedBox(width: 12),
-                  Expanded(child: _field(widget.lastNameCtrl, 'Last Name', required: true)),
+                  Expanded(child: _field(widget.lastNameCtrl, LocaleService.t('last_name'), required: true)),
                 ],
               ),
               const SizedBox(height: 12),
-              _field(widget.line1Ctrl, 'Address Line 1', required: true),
+              _field(widget.line1Ctrl, LocaleService.t('address_line1'), required: true),
               const SizedBox(height: 12),
-              _field(widget.line2Ctrl, 'Address Line 2 (optional)'),
+              _field(widget.line2Ctrl, LocaleService.t('address_line2')),
               const SizedBox(height: 12),
-              _field(widget.cityCtrl, 'City', required: true),
+              _field(widget.cityCtrl, LocaleService.t('city'), required: true),
               const SizedBox(height: 12),
               _field(widget.phoneCtrl, LocaleService.t('phone'), keyboardType: TextInputType.phone),
               const SizedBox(height: 24),

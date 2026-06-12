@@ -99,17 +99,6 @@ class _HomeScreenState extends State<HomeScreen> {
     ]);
   }
 
-  void _openProduct(Map<String, dynamic> product) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ProductDetailsScreen(
-          productId: product['id']?.toString() ?? '',
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<Locale>(
@@ -156,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 24),
                   _buildSectionHeader(
                     context,
-                    'Featured Products',
+                    LocaleService.t('featured_products'),
                     onTap: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const ProductListingScreen())),
                   ),
@@ -197,11 +186,19 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             TextSpan(
               text: 'Q',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.secondary),
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: AppColors.secondary,
+              ),
             ),
             TextSpan(
               text: ' Cart',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
             ),
           ],
         ),
@@ -222,7 +219,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: Text(
               LocaleService.isArabic ? 'EN' : 'AR',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
         ),
@@ -233,7 +234,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         IconButton(
           onPressed: () => Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const CartScreen())),
+            context,
+            MaterialPageRoute(builder: (_) => const CartScreen()),
+          ),
           icon: const Icon(Icons.shopping_cart_outlined),
           color: AppColors.textPrimary,
         ),
@@ -247,7 +250,9 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: GestureDetector(
         onTap: () => Navigator.push(
-            context, MaterialPageRoute(builder: (_) => const ProductListingScreen())),
+          context,
+          MaterialPageRoute(builder: (_) => const ProductListingScreen()),
+        ),
         child: Container(
           height: 50,
           decoration: BoxDecoration(
@@ -262,7 +267,10 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 10),
               Text(
                 LocaleService.t('search_hint'),
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                ),
               ),
             ],
           ),
@@ -302,41 +310,63 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Text(
                       LocaleService.t('limited_offer'),
                       style: const TextStyle(
-                          color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600),
+                        color: AppColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     LocaleService.t('promo_title'),
                     style: const TextStyle(
-                        color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700, height: 1.2),
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   GestureDetector(
                     onTap: () => Navigator.push(
-                        context, MaterialPageRoute(builder: (_) => const ProductListingScreen())),
+                      context,
+                      MaterialPageRoute(builder: (_) => const ProductListingScreen()),
+                    ),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
-                          color: AppColors.primary, borderRadius: BorderRadius.circular(20)),
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
                       child: Text(
                         LocaleService.t('shop_now'),
                         style: const TextStyle(
-                            color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+                          color: AppColors.textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.local_offer_outlined, size: 72, color: Colors.white24),
+            const Icon(
+              Icons.local_offer_outlined,
+              size: 72,
+              color: Colors.white24,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title, {required VoidCallback onTap}) {
+  Widget _buildSectionHeader(
+    BuildContext context,
+    String title, {
+    required VoidCallback onTap,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
@@ -345,14 +375,20 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             title,
             style: const TextStyle(
-                fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
           ),
           GestureDetector(
             onTap: onTap,
             child: Text(
               LocaleService.t('see_all'),
               style: const TextStyle(
-                  color: AppColors.secondary, fontSize: 13, fontWeight: FontWeight.w500),
+                color: AppColors.secondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],
@@ -363,7 +399,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCategoriesRow(BuildContext context) {
     if (_categoriesLoading) {
       return const SizedBox(
-          height: 88, child: Center(child: CircularProgressIndicator(color: AppColors.secondary)));
+        height: 88,
+        child: Center(child: CircularProgressIndicator(color: AppColors.secondary)),
+      );
     }
     if (_categoriesError != null) {
       return SizedBox(
@@ -375,15 +413,6 @@ class _HomeScreenState extends State<HomeScreen> {
             label: Text(LocaleService.t('retry')),
             style: TextButton.styleFrom(foregroundColor: AppColors.secondary),
           ),
-        ),
-      );
-    }
-    if (_categories.isEmpty) {
-      return const SizedBox(
-        height: 88,
-        child: Center(
-          child: Text('No categories',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
         ),
       );
     }
@@ -418,17 +447,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppColors.divider),
                   ),
-                  clipBehavior: Clip.antiAlias,
                   child: imageUrl != null && imageUrl.isNotEmpty
-                      ? Image.network(
-                          imageUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const Icon(
-                              Icons.category_outlined,
-                              color: AppColors.secondary, size: 26),
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(15),
+                          child: Image.network(imageUrl, fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.category_outlined,
+                                    color: AppColors.secondary,
+                                    size: 26,
+                                  )),
                         )
-                      : const Icon(Icons.category_outlined,
-                          color: AppColors.secondary, size: 26),
+                      : const Icon(
+                          Icons.category_outlined,
+                          color: AppColors.secondary,
+                          size: 26,
+                        ),
                 ),
                 const SizedBox(height: 6),
                 SizedBox(
@@ -436,9 +469,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Text(
                     cat['name']?.toString() ?? '',
                     style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w500),
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
@@ -452,7 +486,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Shared horizontal product row used for both Best Selling and Featured.
   Widget _buildProductRow(
     BuildContext context, {
     required List<Map<String, dynamic>> items,
@@ -462,7 +495,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     if (loading) {
       return const SizedBox(
-          height: 210, child: Center(child: CircularProgressIndicator(color: AppColors.secondary)));
+        height: 210,
+        child: Center(child: CircularProgressIndicator(color: AppColors.secondary)),
+      );
     }
     if (error != null) {
       return SizedBox(
@@ -471,9 +506,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(error,
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                  textAlign: TextAlign.center),
+              Text(error, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13), textAlign: TextAlign.center),
               const SizedBox(height: 8),
               TextButton.icon(
                 onPressed: onRetry,
@@ -504,7 +537,14 @@ class _HomeScreenState extends State<HomeScreen> {
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) => _ProductCard(
           product: items[index],
-          onTap: () => _openProduct(items[index]),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ProductDetailsScreen(
+                productId: items[index]['id']?.toString(),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -513,7 +553,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildNewArrivalsGrid(BuildContext context) {
     if (_newArrivalsLoading) {
       return const SizedBox(
-          height: 200, child: Center(child: CircularProgressIndicator(color: AppColors.secondary)));
+        height: 200,
+        child: Center(child: CircularProgressIndicator(color: AppColors.secondary)),
+      );
     }
     if (_newArrivalsError != null) {
       return SizedBox(
@@ -522,9 +564,11 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_newArrivalsError!,
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                  textAlign: TextAlign.center),
+              Text(
+                _newArrivalsError!,
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 8),
               TextButton.icon(
                 onPressed: _fetchNewArrivals,
@@ -540,8 +584,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_newArrivals.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Text(LocaleService.t('no_products'),
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        child: Text(
+          LocaleService.t('no_products'),
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        ),
       );
     }
     return Padding(
@@ -558,16 +604,20 @@ class _HomeScreenState extends State<HomeScreen> {
         itemCount: _newArrivals.length,
         itemBuilder: (context, index) => _ProductCard(
           product: _newArrivals[index],
-          wide: true,
-          onTap: () => _openProduct(_newArrivals[index]),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ProductDetailsScreen(
+                productId: _newArrivals[index]['id']?.toString(),
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-// ── Shared product image helper ───────────────────────────────────────────────
-// images field from API is List<String> (plain URL strings), not List<Map>.
 String? _extractImageUrl(Map<String, dynamic> product) {
   final raw = product['images'];
   if (raw is! List || raw.isEmpty) return null;
@@ -577,35 +627,14 @@ String? _extractImageUrl(Map<String, dynamic> product) {
   return null;
 }
 
-Widget _imageFallback({double height = 110}) {
-  return Container(
-    height: height,
-    width: double.infinity,
-    decoration: const BoxDecoration(
-      gradient: LinearGradient(
-        colors: [Color(0xFFD4F5E9), AppColors.primary],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-    ),
-    child: const Center(
-      child: Icon(Icons.shopping_basket_outlined, size: 44, color: AppColors.secondary),
-    ),
-  );
-}
-
-// ── Product card (home screen — horizontal scroll or grid) ────────────────────
 class _ProductCard extends StatelessWidget {
   const _ProductCard({
     required this.product,
     required this.onTap,
-    this.wide = false,
   });
 
   final Map<String, dynamic> product;
   final VoidCallback onTap;
-  // wide=true: fills grid cell width; false: fixed 148px for horizontal scroll
-  final bool wide;
 
   @override
   Widget build(BuildContext context) {
@@ -617,7 +646,7 @@ class _ProductCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: wide ? null : 148,
+        width: 148,
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
@@ -629,19 +658,18 @@ class _ProductCard extends StatelessWidget {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(16)),
-                  child: imageUrl != null
-                      ? Image.network(
-                          imageUrl,
-                          height: 110,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _imageFallback(height: 110),
-                          loadingBuilder: (_, child, progress) =>
-                              progress == null ? child : _imageFallback(height: 110),
-                        )
-                      : _imageFallback(height: 110),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: SizedBox(
+                    height: 110,
+                    width: double.infinity,
+                    child: imageUrl != null
+                        ? Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _placeholder(),
+                          )
+                        : _placeholder(),
+                  ),
                 ),
                 Positioned(
                   top: 8,
@@ -654,13 +682,17 @@ class _ProductCard extends StatelessWidget {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2)),
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
                       ],
                     ),
-                    child: const Icon(Icons.favorite_border,
-                        size: 16, color: AppColors.textSecondary),
+                    child: const Icon(
+                      Icons.favorite_border,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
               ],
@@ -673,9 +705,10 @@ class _ProductCard extends StatelessWidget {
                   Text(
                     name,
                     style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -686,16 +719,18 @@ class _ProductCard extends StatelessWidget {
                       Text(
                         priceStr,
                         style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.secondary),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.secondary,
+                        ),
                       ),
                       Container(
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
-                            color: AppColors.secondary,
-                            borderRadius: BorderRadius.circular(8)),
+                          color: AppColors.secondary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                         child: const Icon(Icons.add, color: Colors.white, size: 16),
                       ),
                     ],
@@ -704,6 +739,25 @@ class _ProductCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _placeholder() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFD4F5E9), AppColors.primary],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.shopping_basket_outlined,
+          size: 44,
+          color: AppColors.secondary,
         ),
       ),
     );
