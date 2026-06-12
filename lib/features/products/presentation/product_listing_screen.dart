@@ -554,6 +554,34 @@ class _FilterSheetState extends State<_FilterSheet> {
   }
 }
 
+// Extract the first image URL from the product's images field.
+// API returns images as List<String> (plain URL strings), not List<Map>.
+String? _extractImageUrl(Map<String, dynamic> product) {
+  final raw = product['images'];
+  if (raw is! List || raw.isEmpty) return null;
+  final first = raw[0];
+  if (first is String && first.isNotEmpty) return first;
+  if (first is Map) return first['url']?.toString();
+  return null;
+}
+
+Widget _gridImageFallback() {
+  return Container(
+    height: 130,
+    width: double.infinity,
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        colors: [Color(0xFFD4F5E9), AppColors.primary],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    ),
+    child: const Center(
+      child: Icon(Icons.shopping_basket_outlined, size: 48, color: AppColors.secondary),
+    ),
+  );
+}
+
 class _ProductGridCard extends StatelessWidget {
   const _ProductGridCard({
     required this.product,
@@ -586,6 +614,7 @@ class _ProductGridCard extends StatelessWidget {
     final compareAt = (product['compare_at_price'] as num?)?.toDouble();
     final priceStr = '${LocaleService.t('qar')} ${price.toStringAsFixed(2)}';
     final badge = _badge();
+    final imageUrl = _extractImageUrl(product);
 
     return GestureDetector(
       onTap: onTap,
@@ -600,23 +629,19 @@ class _ProductGridCard extends StatelessWidget {
           children: [
             Stack(
               children: [
-                Container(
-                  height: 130,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFD4F5E9), AppColors.primary],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.shopping_basket_outlined,
-                      size: 48,
-                      color: AppColors.secondary,
-                    ),
-                  ),
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: imageUrl != null
+                      ? Image.network(
+                          imageUrl,
+                          height: 130,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _gridImageFallback(),
+                          loadingBuilder: (_, child, progress) =>
+                              progress == null ? child : _gridImageFallback(),
+                        )
+                      : _gridImageFallback(),
                 ),
                 if (badge.isNotEmpty)
                   Positioned(

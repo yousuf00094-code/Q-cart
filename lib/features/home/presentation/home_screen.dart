@@ -17,13 +17,16 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _categoriesLoading = true;
+  bool _featuredLoading = true;
   bool _bestSellingLoading = true;
   bool _newArrivalsLoading = true;
   String? _categoriesError;
+  String? _featuredError;
   String? _bestSellingError;
   String? _newArrivalsError;
 
   List<Map<String, dynamic>> _categories = [];
+  List<Map<String, dynamic>> _featured = [];
   List<Map<String, dynamic>> _bestSelling = [];
   List<Map<String, dynamic>> _newArrivals = [];
 
@@ -31,108 +34,80 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _fetchCategories();
+    _fetchFeatured();
     _fetchBestSelling();
     _fetchNewArrivals();
   }
 
   Future<void> _fetchCategories() async {
-    setState(() {
-      _categoriesLoading = true;
-      _categoriesError = null;
-    });
+    setState(() { _categoriesLoading = true; _categoriesError = null; });
     try {
       final data = await CustomerService.getCategories();
-      if (mounted) {
-        setState(() {
-          _categories = data;
-          _categoriesLoading = false;
-        });
-      }
+      if (mounted) setState(() { _categories = data; _categoriesLoading = false; });
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _categoriesError = e.message;
-          _categoriesLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _categoriesError = LocaleService.t('error_generic');
-          _categoriesLoading = false;
-        });
-      }
+      if (mounted) setState(() { _categoriesError = e.message; _categoriesLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() { _categoriesError = LocaleService.t('error_generic'); _categoriesLoading = false; });
+    }
+  }
+
+  Future<void> _fetchFeatured() async {
+    setState(() { _featuredLoading = true; _featuredError = null; });
+    try {
+      final res = await CustomerService.getProducts(featured: true, limit: 6);
+      final data = (res['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+      if (mounted) setState(() { _featured = data; _featuredLoading = false; });
+    } on ApiException catch (e) {
+      if (mounted) setState(() { _featuredError = e.message; _featuredLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() { _featuredError = LocaleService.t('error_generic'); _featuredLoading = false; });
     }
   }
 
   Future<void> _fetchBestSelling() async {
-    setState(() {
-      _bestSellingLoading = true;
-      _bestSellingError = null;
-    });
+    setState(() { _bestSellingLoading = true; _bestSellingError = null; });
     try {
       final res = await CustomerService.getProducts(sort: 'best_seller', limit: 6);
       final data = (res['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
-      if (mounted) {
-        setState(() {
-          _bestSelling = data;
-          _bestSellingLoading = false;
-        });
-      }
+      if (mounted) setState(() { _bestSelling = data; _bestSellingLoading = false; });
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _bestSellingError = e.message;
-          _bestSellingLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _bestSellingError = LocaleService.t('error_generic');
-          _bestSellingLoading = false;
-        });
-      }
+      if (mounted) setState(() { _bestSellingError = e.message; _bestSellingLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() { _bestSellingError = LocaleService.t('error_generic'); _bestSellingLoading = false; });
     }
   }
 
   Future<void> _fetchNewArrivals() async {
-    setState(() {
-      _newArrivalsLoading = true;
-      _newArrivalsError = null;
-    });
+    setState(() { _newArrivalsLoading = true; _newArrivalsError = null; });
     try {
       final res = await CustomerService.getProducts(sort: 'newest', limit: 8);
       final data = (res['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
-      if (mounted) {
-        setState(() {
-          _newArrivals = data;
-          _newArrivalsLoading = false;
-        });
-      }
+      if (mounted) setState(() { _newArrivals = data; _newArrivalsLoading = false; });
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _newArrivalsError = e.message;
-          _newArrivalsLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _newArrivalsError = LocaleService.t('error_generic');
-          _newArrivalsLoading = false;
-        });
-      }
+      if (mounted) setState(() { _newArrivalsError = e.message; _newArrivalsLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() { _newArrivalsError = LocaleService.t('error_generic'); _newArrivalsLoading = false; });
     }
   }
 
   Future<void> _onRefresh() async {
     await Future.wait([
       _fetchCategories(),
+      _fetchFeatured(),
       _fetchBestSelling(),
       _fetchNewArrivals(),
     ]);
+  }
+
+  void _openProduct(Map<String, dynamic> product) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductDetailsScreen(
+          productId: product['id']?.toString() ?? '',
+        ),
+      ),
+    );
   }
 
   @override
@@ -167,25 +142,38 @@ class _HomeScreenState extends State<HomeScreen> {
                   _buildSectionHeader(
                     context,
                     LocaleService.t('best_selling'),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ProductListingScreen(),
-                      ),
-                    ),
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const ProductListingScreen())),
                   ),
                   const SizedBox(height: 12),
-                  _buildBestSellingRow(context),
+                  _buildProductRow(
+                    context,
+                    items: _bestSelling,
+                    loading: _bestSellingLoading,
+                    error: _bestSellingError,
+                    onRetry: _fetchBestSelling,
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSectionHeader(
+                    context,
+                    'Featured Products',
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const ProductListingScreen())),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildProductRow(
+                    context,
+                    items: _featured,
+                    loading: _featuredLoading,
+                    error: _featuredError,
+                    onRetry: _fetchFeatured,
+                  ),
                   const SizedBox(height: 24),
                   _buildSectionHeader(
                     context,
                     LocaleService.t('new_arrivals'),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ProductListingScreen(),
-                      ),
-                    ),
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const ProductListingScreen())),
                   ),
                   const SizedBox(height: 12),
                   _buildNewArrivalsGrid(context),
@@ -209,19 +197,11 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             TextSpan(
               text: 'Q',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                color: AppColors.secondary,
-              ),
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.secondary),
             ),
             TextSpan(
               text: ' Cart',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
             ),
           ],
         ),
@@ -242,11 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: Text(
               LocaleService.isArabic ? 'EN' : 'AR',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
             ),
           ),
         ),
@@ -257,9 +233,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         IconButton(
           onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CartScreen()),
-          ),
+              context, MaterialPageRoute(builder: (_) => const CartScreen())),
           icon: const Icon(Icons.shopping_cart_outlined),
           color: AppColors.textPrimary,
         ),
@@ -273,9 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: GestureDetector(
         onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const ProductListingScreen()),
-        ),
+            context, MaterialPageRoute(builder: (_) => const ProductListingScreen())),
         child: Container(
           height: 50,
           decoration: BoxDecoration(
@@ -290,10 +262,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 10),
               Text(
                 LocaleService.t('search_hint'),
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 14,
-                ),
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
               ),
             ],
           ),
@@ -333,63 +302,41 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Text(
                       LocaleService.t('limited_offer'),
                       style: const TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
+                          color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     LocaleService.t('promo_title'),
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                    ),
+                        color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700, height: 1.2),
                   ),
                   const SizedBox(height: 12),
                   GestureDetector(
                     onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const ProductListingScreen()),
-                    ),
+                        context, MaterialPageRoute(builder: (_) => const ProductListingScreen())),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                          color: AppColors.primary, borderRadius: BorderRadius.circular(20)),
                       child: Text(
                         LocaleService.t('shop_now'),
                         style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
+                            color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(
-              Icons.local_offer_outlined,
-              size: 72,
-              color: Colors.white24,
-            ),
+            const Icon(Icons.local_offer_outlined, size: 72, color: Colors.white24),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSectionHeader(
-    BuildContext context,
-    String title, {
-    required VoidCallback onTap,
-  }) {
+  Widget _buildSectionHeader(BuildContext context, String title, {required VoidCallback onTap}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
@@ -398,20 +345,14 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             title,
             style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
+                fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
           ),
           GestureDetector(
             onTap: onTap,
             child: Text(
               LocaleService.t('see_all'),
               style: const TextStyle(
-                color: AppColors.secondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
+                  color: AppColors.secondary, fontSize: 13, fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -422,9 +363,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCategoriesRow(BuildContext context) {
     if (_categoriesLoading) {
       return const SizedBox(
-        height: 88,
-        child: Center(child: CircularProgressIndicator(color: AppColors.secondary)),
-      );
+          height: 88, child: Center(child: CircularProgressIndicator(color: AppColors.secondary)));
     }
     if (_categoriesError != null) {
       return SizedBox(
@@ -439,6 +378,15 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
+    if (_categories.isEmpty) {
+      return const SizedBox(
+        height: 88,
+        child: Center(
+          child: Text('No categories',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        ),
+      );
+    }
     final displayCategories = _categories.take(8).toList();
     return SizedBox(
       height: 88,
@@ -449,6 +397,7 @@ class _HomeScreenState extends State<HomeScreen> {
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           final cat = displayCategories[index];
+          final imageUrl = cat['image_url']?.toString();
           return GestureDetector(
             onTap: () => Navigator.push(
               context,
@@ -469,11 +418,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppColors.divider),
                   ),
-                  child: const Icon(
-                    Icons.category_outlined,
-                    color: AppColors.secondary,
-                    size: 26,
-                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: imageUrl != null && imageUrl.isNotEmpty
+                      ? Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(
+                              Icons.category_outlined,
+                              color: AppColors.secondary, size: 26),
+                        )
+                      : const Icon(Icons.category_outlined,
+                          color: AppColors.secondary, size: 26),
                 ),
                 const SizedBox(height: 6),
                 SizedBox(
@@ -481,10 +436,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Text(
                     cat['name']?.toString() ?? '',
                     style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
@@ -498,28 +452,31 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildBestSellingRow(BuildContext context) {
-    if (_bestSellingLoading) {
+  // Shared horizontal product row used for both Best Selling and Featured.
+  Widget _buildProductRow(
+    BuildContext context, {
+    required List<Map<String, dynamic>> items,
+    required bool loading,
+    required String? error,
+    required VoidCallback onRetry,
+  }) {
+    if (loading) {
       return const SizedBox(
-        height: 210,
-        child: Center(child: CircularProgressIndicator(color: AppColors.secondary)),
-      );
+          height: 210, child: Center(child: CircularProgressIndicator(color: AppColors.secondary)));
     }
-    if (_bestSellingError != null) {
+    if (error != null) {
       return SizedBox(
         height: 210,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                _bestSellingError!,
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                textAlign: TextAlign.center,
-              ),
+              Text(error,
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  textAlign: TextAlign.center),
               const SizedBox(height: 8),
               TextButton.icon(
-                onPressed: _fetchBestSelling,
+                onPressed: onRetry,
                 icon: const Icon(Icons.refresh, size: 16),
                 label: Text(LocaleService.t('retry')),
                 style: TextButton.styleFrom(foregroundColor: AppColors.secondary),
@@ -529,14 +486,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-    if (_bestSelling.isEmpty) {
+    if (items.isEmpty) {
       return SizedBox(
         height: 210,
         child: Center(
-          child: Text(
-            LocaleService.t('no_products'),
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-          ),
+          child: Text(LocaleService.t('no_products'),
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
         ),
       );
     }
@@ -545,18 +500,11 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
-        itemCount: _bestSelling.length,
+        itemCount: items.length,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) => _ProductCard(
-          product: _bestSelling[index],
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ProductDetailsScreen(
-                productId: _bestSelling[index]['id']?.toString(),
-              ),
-            ),
-          ),
+          product: items[index],
+          onTap: () => _openProduct(items[index]),
         ),
       ),
     );
@@ -565,9 +513,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildNewArrivalsGrid(BuildContext context) {
     if (_newArrivalsLoading) {
       return const SizedBox(
-        height: 200,
-        child: Center(child: CircularProgressIndicator(color: AppColors.secondary)),
-      );
+          height: 200, child: Center(child: CircularProgressIndicator(color: AppColors.secondary)));
     }
     if (_newArrivalsError != null) {
       return SizedBox(
@@ -576,11 +522,9 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                _newArrivalsError!,
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                textAlign: TextAlign.center,
-              ),
+              Text(_newArrivalsError!,
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  textAlign: TextAlign.center),
               const SizedBox(height: 8),
               TextButton.icon(
                 onPressed: _fetchNewArrivals,
@@ -596,10 +540,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_newArrivals.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Text(
-          LocaleService.t('no_products'),
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-        ),
+        child: Text(LocaleService.t('no_products'),
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
       );
     }
     return Padding(
@@ -616,39 +558,66 @@ class _HomeScreenState extends State<HomeScreen> {
         itemCount: _newArrivals.length,
         itemBuilder: (context, index) => _ProductCard(
           product: _newArrivals[index],
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ProductDetailsScreen(
-                productId: _newArrivals[index]['id']?.toString(),
-              ),
-            ),
-          ),
+          wide: true,
+          onTap: () => _openProduct(_newArrivals[index]),
         ),
       ),
     );
   }
 }
 
+// ── Shared product image helper ───────────────────────────────────────────────
+// images field from API is List<String> (plain URL strings), not List<Map>.
+String? _extractImageUrl(Map<String, dynamic> product) {
+  final raw = product['images'];
+  if (raw is! List || raw.isEmpty) return null;
+  final first = raw[0];
+  if (first is String && first.isNotEmpty) return first;
+  if (first is Map) return first['url']?.toString();
+  return null;
+}
+
+Widget _imageFallback({double height = 110}) {
+  return Container(
+    height: height,
+    width: double.infinity,
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        colors: [Color(0xFFD4F5E9), AppColors.primary],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    ),
+    child: const Center(
+      child: Icon(Icons.shopping_basket_outlined, size: 44, color: AppColors.secondary),
+    ),
+  );
+}
+
+// ── Product card (home screen — horizontal scroll or grid) ────────────────────
 class _ProductCard extends StatelessWidget {
   const _ProductCard({
     required this.product,
     required this.onTap,
+    this.wide = false,
   });
 
   final Map<String, dynamic> product;
   final VoidCallback onTap;
+  // wide=true: fills grid cell width; false: fixed 148px for horizontal scroll
+  final bool wide;
 
   @override
   Widget build(BuildContext context) {
     final name = product['name']?.toString() ?? '';
     final price = (product['price'] as num?)?.toDouble() ?? 0.0;
     final priceStr = '${LocaleService.t('qar')} ${price.toStringAsFixed(2)}';
+    final imageUrl = _extractImageUrl(product);
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 148,
+        width: wide ? null : 148,
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
@@ -659,49 +628,39 @@ class _ProductCard extends StatelessWidget {
           children: [
             Stack(
               children: [
-                Container(
-                  height: 110,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFD4F5E9), AppColors.primary],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.shopping_basket_outlined,
-                      size: 44,
-                      color: AppColors.secondary,
-                    ),
-                  ),
+                ClipRRect(
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: imageUrl != null
+                      ? Image.network(
+                          imageUrl,
+                          height: 110,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _imageFallback(height: 110),
+                          loadingBuilder: (_, child, progress) =>
+                              progress == null ? child : _imageFallback(height: 110),
+                        )
+                      : _imageFallback(height: 110),
                 ),
                 Positioned(
                   top: 8,
                   right: 8,
-                  child: GestureDetector(
-                    onTap: () {},
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
                             color: Colors.black.withOpacity(0.08),
                             blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.favorite_border,
-                        size: 16,
-                        color: AppColors.textSecondary,
-                      ),
+                            offset: const Offset(0, 2)),
+                      ],
                     ),
+                    child: const Icon(Icons.favorite_border,
+                        size: 16, color: AppColors.textSecondary),
                   ),
                 ),
               ],
@@ -714,10 +673,9 @@ class _ProductCard extends StatelessWidget {
                   Text(
                     name,
                     style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -728,22 +686,17 @@ class _ProductCard extends StatelessWidget {
                       Text(
                         priceStr,
                         style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.secondary,
-                        ),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.secondary),
                       ),
-                      GestureDetector(
-                        onTap: () {},
-                        child: Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
                             color: AppColors.secondary,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.add, color: Colors.white, size: 16),
-                        ),
+                            borderRadius: BorderRadius.circular(8)),
+                        child: const Icon(Icons.add, color: Colors.white, size: 16),
                       ),
                     ],
                   ),

@@ -1,6 +1,17 @@
 import 'api_client.dart';
 
 class CustomerService {
+  // ── Sort key mapping ──────────────────────────────────────────────────────
+  // Frontend uses readable keys; backend orderMap uses these exact values.
+  static String _mapSort(String sort) {
+    switch (sort) {
+      case 'best_seller': return 'sold_desc';
+      case 'newest':      return 'created_at_desc';
+      case 'top_rated':   return 'rating_desc';
+      default:            return sort; // price_asc, price_desc pass through
+    }
+  }
+
   // ── Products ──────────────────────────────────────────────────────────────
 
   static Future<Map<String, dynamic>> getProducts({
@@ -11,15 +22,17 @@ class CustomerService {
     double? minPrice,
     double? maxPrice,
     String sort = 'newest',
+    bool featured = false,
   }) async {
     final params = <String, String>{
       'page': page.toString(),
       'limit': limit.toString(),
-      'sort': sort,
+      'sort': _mapSort(sort),
       if (categoryId != null) 'category_id': categoryId,
       if (search != null && search.isNotEmpty) 'search': search,
       if (minPrice != null) 'min_price': minPrice.toString(),
       if (maxPrice != null) 'max_price': maxPrice.toString(),
+      if (featured) 'featured': 'true',
     };
     final qs = params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
     return ApiClient.get('/products?$qs');

@@ -387,21 +387,28 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     }
 
     final product = _product!;
-    final images = (product['images'] as List<dynamic>?)
-            ?.cast<Map<String, dynamic>>() ??
-        [];
+    // images is List<String> (plain URL strings from JSONB column).
+    // Guard against both String elements and legacy Map elements.
+    final rawImages = product['images'] as List<dynamic>? ?? [];
+    final images = rawImages
+        .map<String?>((e) {
+          if (e is String && e.isNotEmpty) return e;
+          if (e is Map) return e['url']?.toString();
+          return null;
+        })
+        .whereType<String>()
+        .toList();
     final imageCount = images.isEmpty ? 1 : images.length;
     final comparePrice =
         (product['compare_at_price'] as num?)?.toDouble();
     final price = (product['price'] as num?)?.toDouble() ?? 0.0;
     final isSale =
         comparePrice != null && comparePrice > price;
-    final categoryName =
-        (product['category'] as Map<String, dynamic>?)?['name']
-            as String?;
+    // Backend returns flat fields from SQL JOIN aliases, not nested objects.
+    final categoryName = product['category_name']?.toString();
     final avgRating =
-        (product['avg_rating'] as num?)?.toDouble() ?? 0.0;
-    final reviewCount = (product['review_count'] as int?) ?? 0;
+        (product['average_rating'] as num?)?.toDouble() ?? 0.0;
+    final reviewCount = (product['review_count'] as num?)?.toInt() ?? 0;
     final description =
         (product['description'] as String?) ?? '';
     final isActive = product['is_active'] as bool? ?? true;
@@ -450,7 +457,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
   Widget _buildSliverAppBar(
     BuildContext context,
-    List<Map<String, dynamic>> images,
+    List<String> images,
     int imageCount,
     bool isSale,
   ) {
@@ -549,17 +556,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   setState(() => _currentImageIndex = i),
               itemBuilder: (context, index) {
                 if (images.isNotEmpty) {
-                  final url =
-                      images[index]['url'] as String? ?? '';
                   return Image.network(
-                    url,
+                    images[index],
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        _imagePlaceholder(),
-                    loadingBuilder: (ctx, child, progress) {
-                      if (progress == null) return child;
-                      return _imagePlaceholder();
-                    },
+                    errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                    loadingBuilder: (_, child, progress) =>
+                        progress == null ? child : _imagePlaceholder(),
                   );
                 }
                 return _imagePlaceholder();
