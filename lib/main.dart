@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'core/config/environment.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/auth_service.dart';
 import 'core/services/locale_service.dart';
@@ -35,6 +37,7 @@ import 'features/admin/presentation/suppliers/supplier_product_management_screen
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  debugPrint('[Q Cart] env=${AppEnvironment.name}  api=${AppEnvironment.apiBaseUrl}');
   await AuthService.init();
   await LocaleService.init();
   await NotificationService.init();
