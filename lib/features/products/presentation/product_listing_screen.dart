@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/services/customer_service.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/services/locale_service.dart';
+import '../../../core/utils/parse_num.dart';
 import '../../products/presentation/product_details_screen.dart';
 
 class ProductListingScreen extends StatefulWidget {
@@ -95,7 +96,7 @@ class _ProductListingScreenState extends State<ProductListingScreen> {
       );
       final data = (res['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
       final meta = res['meta'] as Map<String, dynamic>?;
-      final pages = (meta?['pages'] as num?)?.toInt() ?? 1;
+      final pages = parseInt(meta?['total_pages'], 1);
       if (mounted) {
         setState(() {
           _products = data;
@@ -140,7 +141,7 @@ class _ProductListingScreenState extends State<ProductListingScreen> {
       );
       final data = (res['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
       final meta = res['meta'] as Map<String, dynamic>?;
-      final pages = (meta?['pages'] as num?)?.toInt() ?? _totalPages;
+      final pages = parseInt(meta?['total_pages'], _totalPages);
       if (mounted) {
         setState(() {
           _products.addAll(data);
@@ -594,8 +595,8 @@ class _ProductGridCard extends StatelessWidget {
   String _badge() {
     final tags = product['tags'] as List<dynamic>?;
     if (tags != null && tags.contains('best_seller')) return 'Best Seller';
-    final compareAt = (product['compare_at_price'] as num?)?.toDouble();
-    final price = (product['price'] as num?)?.toDouble() ?? 0;
+    final compareAt = parseDoubleOrNull(product['compare_at_price']);
+    final price = parseDouble(product['price']);
     if (compareAt != null && compareAt > price) return 'Sale';
     final createdAt = product['created_at'] as String?;
     if (createdAt != null) {
@@ -610,8 +611,8 @@ class _ProductGridCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = product['name']?.toString() ?? '';
-    final price = (product['price'] as num?)?.toDouble() ?? 0.0;
-    final compareAt = (product['compare_at_price'] as num?)?.toDouble();
+    final price = parseDouble(product['price']);
+    final compareAt = parseDoubleOrNull(product['compare_at_price']);
     final priceStr = '${LocaleService.t('qar')} ${price.toStringAsFixed(2)}';
     final badge = _badge();
     final imageUrl = _extractImageUrl(product);

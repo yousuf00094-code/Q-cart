@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/services/locale_service.dart';
 import '../../../core/services/customer_service.dart';
 import '../../../core/services/api_client.dart';
+import '../../../core/utils/parse_num.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final String orderId;
@@ -194,9 +195,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final items = (order['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
     final address = order['address'] as Map<String, dynamic>?;
     final paymentMethod = order['payment_method']?.toString() ?? 'cash_on_delivery';
-    final subtotal = (order['subtotal'] as num?)?.toDouble() ?? (order['total'] as num?)?.toDouble() ?? 0;
-    final total = (order['total'] as num?)?.toDouble() ?? 0;
-    final delivery = (order['delivery_fee'] as num?)?.toDouble() ?? (total - subtotal > 0 ? total - subtotal : 0);
+    final total = parseDouble(order['total']);
+    final subtotal = order['subtotal'] != null ? parseDouble(order['subtotal']) : total;
+    final delivery = parseDouble(order['delivery_fee'], total - subtotal > 0 ? total - subtotal : 0);
     final step = _statusToStep(status);
 
     return SingleChildScrollView(
@@ -224,8 +225,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       final item = e.value;
                       final product = item['product'] as Map<String, dynamic>?;
                       final name = product?['name']?.toString() ?? 'Product';
-                      final price = (product?['price'] as num?)?.toDouble() ?? 0;
-                      final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+                      final price = parseDouble(product?['price']);
+                      final qty = parseInt(item['quantity'], 1);
                       return Column(
                         children: [
                           if (i > 0) const Divider(color: AppColors.divider, height: 16),

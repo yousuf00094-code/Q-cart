@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/services/customer_service.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/services/locale_service.dart';
+import '../../../core/utils/parse_num.dart';
 import '../../products/presentation/product_details_screen.dart';
 import '../../cart/presentation/cart_screen.dart';
 import '../../products/presentation/product_listing_screen.dart';
@@ -657,7 +658,7 @@ class _ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = product['name']?.toString() ?? '';
-    final price = (product['price'] as num?)?.toDouble() ?? 0.0;
+    final price = parseDouble(product['price']);
     final priceStr = '${LocaleService.t('qar')} ${price.toStringAsFixed(2)}';
     final imageUrl = _extractImageUrl(product);
 

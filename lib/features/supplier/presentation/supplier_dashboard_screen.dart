@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/services/supplier_service.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/api_client.dart';
+import '../../../core/utils/parse_num.dart';
 import 'supplier_product_submission_screen.dart';
 import 'supplier_inventory_screen.dart';
 import 'supplier_purchase_orders_screen.dart';
@@ -115,11 +116,11 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
 
       // Pending approvals count
       final inactiveMeta = inactiveResult['meta'] as Map<String, dynamic>? ?? {};
-      final pendingCount = (inactiveMeta['total'] as num?)?.toInt() ?? 0;
+      final pendingCount = parseInt(inactiveMeta['total']);
 
       // Low stock count
       final lowStockMeta = lowStockResult['meta'] as Map<String, dynamic>? ?? {};
-      final lowStockCount = (lowStockMeta['total'] as num?)?.toInt() ?? 0;
+      final lowStockCount = parseInt(lowStockMeta['total']);
 
       if (!mounted) return;
       setState(() {

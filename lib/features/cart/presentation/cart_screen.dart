@@ -4,6 +4,7 @@ import '../../../core/services/cart_service.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/locale_service.dart';
 import '../../../core/services/api_client.dart';
+import '../../../core/utils/parse_num.dart';
 import '../../../app_shell.dart';
 
 class CartScreen extends StatefulWidget {
@@ -49,8 +50,7 @@ class _CartScreenState extends State<CartScreen> {
           (data?['items'] as List<dynamic>?)
               ?.cast<Map<String, dynamic>>() ??
               [];
-      final sub =
-          (data?['subtotal'] as num?)?.toDouble() ?? 0.0;
+      final sub = parseDouble(data?['subtotal']);
       if (mounted) {
         setState(() {
           _items = rawItems;
@@ -73,9 +73,7 @@ class _CartScreenState extends State<CartScreen> {
 
   double get _discountAmount {
     if (_appliedCoupon == null) return 0.0;
-    final pct =
-        (_appliedCoupon!['discount_percentage'] as num?)?.toDouble() ??
-            0.0;
+    final pct = parseDouble(_appliedCoupon!['discount_percentage']);
     return _subtotal * pct / 100;
   }
 
@@ -87,11 +85,8 @@ class _CartScreenState extends State<CartScreen> {
     final itemId = item['id']?.toString() ?? '';
     final oldItems = List<Map<String, dynamic>>.from(_items);
     final oldSubtotal = _subtotal;
-    final price =
-        ((item['product'] as Map<String, dynamic>?)?['price']
-                    as num?)
-                ?.toDouble() ??
-            0.0;
+    final price = parseDouble(
+        (item['product'] as Map<String, dynamic>?)?['price']);
 
     if (newQty <= 0) {
       setState(() {
@@ -101,11 +96,8 @@ class _CartScreenState extends State<CartScreen> {
             0.0,
             (sum, i) =>
                 sum +
-                (((i['product'] as Map<String, dynamic>?)?[
-                                'price'] as num?)
-                            ?.toDouble() ??
-                        0.0) *
-                    ((i['quantity'] as int?) ?? 1));
+                parseDouble((i['product'] as Map<String, dynamic>?)?['price']) *
+                    parseInt(i['quantity'], 1));
       });
       CustomerShell.of(context)
           ?.updateCartCount(_items.length);
@@ -137,11 +129,8 @@ class _CartScreenState extends State<CartScreen> {
           0.0,
           (sum, i) =>
               sum +
-              (((i['product'] as Map<String, dynamic>?)?['price']
-                              as num?)
-                          ?.toDouble() ??
-                      0.0) *
-                  ((i['quantity'] as int?) ?? 1));
+              parseDouble((i['product'] as Map<String, dynamic>?)?['price']) *
+                  parseInt(i['quantity'], 1));
     });
 
     try {
@@ -168,11 +157,8 @@ class _CartScreenState extends State<CartScreen> {
           0.0,
           (sum, i) =>
               sum +
-              (((i['product'] as Map<String, dynamic>?)?['price']
-                              as num?)
-                          ?.toDouble() ??
-                      0.0) *
-                  ((i['quantity'] as int?) ?? 1));
+              parseDouble((i['product'] as Map<String, dynamic>?)?['price']) *
+                  parseInt(i['quantity'], 1));
     });
     CustomerShell.of(context)?.updateCartCount(_items.length);
 
@@ -434,10 +420,8 @@ class _CartScreenState extends State<CartScreen> {
                     : null;
                 final name =
                     (product?['name'] as String?) ?? '';
-                final price =
-                    (product?['price'] as num?)?.toDouble() ??
-                        0.0;
-                final qty = (item['quantity'] as int?) ?? 1;
+                final price = parseDouble(product?['price']);
+                final qty = parseInt(item['quantity'], 1);
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -499,7 +483,7 @@ class _CartScreenState extends State<CartScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Coupon applied: ${(_appliedCoupon!['discount_percentage'] as num?)?.toStringAsFixed(0) ?? ''}% off',
+                    'Coupon applied: ${parseDouble(_appliedCoupon!['discount_percentage']).toStringAsFixed(0)}% off',
                     style: const TextStyle(
                       fontSize: 13,
                       color: Color(0xFF2ECC71),

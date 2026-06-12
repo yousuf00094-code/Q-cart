@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/services/customer_service.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/services/locale_service.dart';
+import '../../../core/utils/parse_num.dart';
 
 class PaymentScreen extends StatefulWidget {
   final String addressId;
@@ -46,7 +47,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           _invoiceId = data['invoice_id'] as String?;
           _paymentUrl = data['payment_url'] as String?;
           _qrImageBase64 = data['qr_image'] as String?;
-          _amount = (data['amount'] as num?)?.toDouble();
+          _amount = parseDoubleOrNull(data['amount']);
           _initiating = false;
         });
       }

@@ -6,6 +6,7 @@ import '../../../core/services/wishlist_service.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/locale_service.dart';
 import '../../../core/services/api_client.dart';
+import '../../../core/utils/parse_num.dart';
 import '../../../app_shell.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
@@ -399,16 +400,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         .whereType<String>()
         .toList();
     final imageCount = images.isEmpty ? 1 : images.length;
-    final comparePrice =
-        (product['compare_at_price'] as num?)?.toDouble();
-    final price = (product['price'] as num?)?.toDouble() ?? 0.0;
-    final isSale =
-        comparePrice != null && comparePrice > price;
+    final comparePrice = parseDoubleOrNull(product['compare_at_price']);
+    final price = parseDouble(product['price']);
+    final isSale = comparePrice != null && comparePrice > price;
     // Backend returns flat fields from SQL JOIN aliases, not nested objects.
     final categoryName = product['category_name']?.toString();
-    final avgRating =
-        (product['average_rating'] as num?)?.toDouble() ?? 0.0;
-    final reviewCount = (product['review_count'] as num?)?.toInt() ?? 0;
+    final avgRating = parseDouble(product['average_rating']);
+    final reviewCount = parseInt(product['review_count']);
     final description =
         (product['description'] as String?) ?? '';
     final isActive = product['is_active'] as bool? ?? true;

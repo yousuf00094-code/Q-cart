@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/services/wishlist_service.dart';
 import '../../../core/services/cart_service.dart';
 import '../../../core/services/locale_service.dart';
+import '../../../core/utils/parse_num.dart';
 import '../../../app_shell.dart';
 import '../../products/presentation/product_details_screen.dart';
 
@@ -324,8 +325,7 @@ class _WishlistItemCardState
     final product =
         widget.item['product'] as Map<String, dynamic>?;
     final name = (product?['name'] as String?) ?? '';
-    final price =
-        (product?['price'] as num?)?.toDouble() ?? 0.0;
+    final price = parseDouble(product?['price']);
     final rawImages = product?['images'] as List<dynamic>? ?? [];
     final imageUrl = rawImages.isNotEmpty
         ? (rawImages.first is String

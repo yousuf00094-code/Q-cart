@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/supplier_service.dart';
 import '../../../core/services/api_client.dart';
+import '../../../core/utils/parse_num.dart';
 
 class SupplierPayoutScreen extends StatefulWidget {
   const SupplierPayoutScreen({super.key});
@@ -980,9 +981,9 @@ class _PayoutRecord {
   factory _PayoutRecord.fromJson(Map<String, dynamic> j) {
     return _PayoutRecord(
       id: j['id']?.toString() ?? '',
-      netAmount: (j['net_amount'] as num?)?.toDouble() ?? 0.0,
-      grossAmount: (j['gross_amount'] as num?)?.toDouble() ?? 0.0,
-      commissionAmount: (j['commission_amount'] as num?)?.toDouble() ?? 0.0,
+      netAmount: parseDouble(j['net_amount']),
+      grossAmount: parseDouble(j['gross_amount']),
+      commissionAmount: parseDouble(j['commission_amount']),
       status: j['status']?.toString() ?? 'pending',
       periodStart: j['period_start']?.toString() ?? '',
       periodEnd: j['period_end']?.toString() ?? '',
@@ -1009,9 +1010,9 @@ class _PayoutItem {
     return _PayoutItem(
       id: j['id']?.toString() ?? '',
       orderNumber: j['order_number']?.toString() ?? '',
-      net: (j['net'] as num?)?.toDouble() ?? 0.0,
-      gross: (j['gross'] as num?)?.toDouble() ?? 0.0,
-      commission: (j['commission'] as num?)?.toDouble() ?? 0.0,
+      net: parseDouble(j['net']),
+      gross: parseDouble(j['gross']),
+      commission: parseDouble(j['commission']),
     );
   }
 }

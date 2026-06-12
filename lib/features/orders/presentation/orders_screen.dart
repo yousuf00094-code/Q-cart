@@ -4,6 +4,7 @@ import '../../../core/services/locale_service.dart';
 import '../../../core/services/customer_service.dart';
 import '../../../core/services/cart_service.dart';
 import '../../../core/services/api_client.dart';
+import '../../../core/utils/parse_num.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -90,7 +91,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       for (final item in items) {
         final product = item['product'] as Map<String, dynamic>?;
         final productId = product?['id']?.toString();
-        final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+        final qty = parseInt(item['quantity'], 1);
         if (productId != null) {
           await CartService.addItem(productId, qty);
         }
@@ -257,7 +258,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
     final status = order['status']?.toString() ?? '';
     final total = order['total'];
     final totalStr = total is num ? total.toStringAsFixed(2) : (total?.toString() ?? '0.00');
-    final itemCount = (order['item_count'] as num?)?.toInt() ?? 0;
+    final itemCount = parseInt(order['item_count']);
     final createdAt = order['created_at']?.toString() ?? '';
     final dateStr = _formatDate(createdAt);
     final canCancel = status == 'pending' || status == 'confirmed';
@@ -371,7 +372,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
     final status = order['status']?.toString() ?? '';
     final total = order['total'];
     final totalStr = total is num ? total.toStringAsFixed(2) : (total?.toString() ?? '0.00');
-    final itemCount = (order['item_count'] as num?)?.toInt() ?? 0;
+    final itemCount = parseInt(order['item_count']);
     final createdAt = order['created_at']?.toString() ?? '';
     final dateStr = _formatDate(createdAt);
     final isDelivered = status == 'delivered';

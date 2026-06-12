@@ -4,6 +4,7 @@ import '../../../core/services/locale_service.dart';
 import '../../../core/services/customer_service.dart';
 import '../../../core/services/cart_service.dart';
 import '../../../core/services/api_client.dart';
+import '../../../core/utils/parse_num.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final String? couponCode;
@@ -110,7 +111,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   double get _discountAmount {
     if (_couponData == null) return 0;
     final type = _couponData!['discount_type']?.toString();
-    final value = (_couponData!['discount_value'] as num?)?.toDouble() ?? 0;
+    final value = parseDouble(_couponData!['discount_value']);
     if (type == 'percentage') return (_subtotal * value / 100);
     return value;
   }
@@ -503,8 +504,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ..._cartItems.map((item) {
             final product = item['product'] as Map<String, dynamic>?;
             final name = product?['name']?.toString() ?? 'Product';
-            final price = (product?['price'] as num?)?.toDouble() ?? 0;
-            final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+            final price = parseDouble(product?['price']);
+            final qty = parseInt(item['quantity'], 1);
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(

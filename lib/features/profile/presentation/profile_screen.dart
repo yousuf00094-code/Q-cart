@@ -4,6 +4,7 @@ import '../../../core/services/locale_service.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/customer_service.dart';
 import '../../../core/services/api_client.dart';
+import '../../../core/utils/parse_num.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -239,7 +240,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildLoggedInView() {
     final fullName = _profile?['full_name']?.toString() ?? '';
     final email = _profile?['email']?.toString() ?? '';
-    final loyaltyPoints = (_profile?['loyalty_points'] as num?)?.toInt() ?? 0;
+    final loyaltyPoints = parseInt(_profile?['loyalty_points']);
     final since = _memberSince();
     final currentLang = LocaleService.isArabic ? LocaleService.t('arabic') : LocaleService.t('english');
 
