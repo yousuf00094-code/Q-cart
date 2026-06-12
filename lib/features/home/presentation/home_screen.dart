@@ -3,7 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/services/customer_service.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/services/locale_service.dart';
-import '../../product/presentation/product_details_screen.dart';
+import '../../products/presentation/product_details_screen.dart';
 import '../../cart/presentation/cart_screen.dart';
 import '../../products/presentation/product_listing_screen.dart';
 import '../../../app_shell.dart';
@@ -506,13 +506,31 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(error, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13), textAlign: TextAlign.center),
+              const Icon(Icons.wifi_off_outlined, size: 32, color: AppColors.textSecondary),
               const SizedBox(height: 8),
-              TextButton.icon(
+              Text(
+                LocaleService.t('error_generic'),
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Server may be starting up — tap retry',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh, size: 16),
                 label: Text(LocaleService.t('retry')),
-                style: TextButton.styleFrom(foregroundColor: AppColors.secondary),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.secondary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
               ),
             ],
           ),
@@ -541,7 +559,7 @@ class _HomeScreenState extends State<HomeScreen> {
             context,
             MaterialPageRoute(
               builder: (_) => ProductDetailsScreen(
-                productId: items[index]['id']?.toString(),
+                productId: items[index]['id']?.toString() ?? '',
               ),
             ),
           ),
@@ -608,7 +626,7 @@ class _HomeScreenState extends State<HomeScreen> {
             context,
             MaterialPageRoute(
               builder: (_) => ProductDetailsScreen(
-                productId: _newArrivals[index]['id']?.toString(),
+                productId: _newArrivals[index]['id']?.toString() ?? '',
               ),
             ),
           ),

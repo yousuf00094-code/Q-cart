@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/environment.dart';
@@ -11,13 +12,20 @@ class ApiClient {
   static void clearToken() => _accessToken = null;
   static bool get hasToken => _accessToken != null;
 
+  // GET requests omit Content-Type (no body) — avoids CORS preflight for unauthenticated reads.
+  static Map<String, String> get _getHeaders => {
+    if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
+  };
+
   static Map<String, String> get _headers => {
     'Content-Type': 'application/json',
     if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
   };
 
   static Future<Map<String, dynamic>> get(String path) async {
-    final response = await http.get(Uri.parse('$baseUrl$path'), headers: _headers);
+    final response = await http
+        .get(Uri.parse('$baseUrl$path'), headers: _getHeaders)
+        .timeout(const Duration(seconds: 30));
     return _handle(response);
   }
 

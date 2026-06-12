@@ -3,7 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/services/customer_service.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/services/locale_service.dart';
-import '../../product/presentation/product_details_screen.dart';
+import '../../products/presentation/product_details_screen.dart';
 
 class ProductListingScreen extends StatefulWidget {
   const ProductListingScreen({
@@ -337,7 +337,7 @@ class _ProductListingScreenState extends State<ProductListingScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => ProductDetailsScreen(
-                          productId: product['id']?.toString(),
+                          productId: product['id']?.toString() ?? '',
                         ),
                       ),
                     ),
