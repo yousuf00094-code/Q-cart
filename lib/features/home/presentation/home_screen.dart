@@ -58,7 +58,6 @@ class _HomeScreenState extends State<HomeScreen> {
       debugPrint('[Home] fetchFeatured: starting');
       final res = await CustomerService.getProducts(featured: true, limit: 6);
       final raw = res['data'];
-      debugPrint('[Home] fetchFeatured: raw type=${raw.runtimeType}');
       final data = _parseProductList(raw);
       debugPrint('[Home] fetchFeatured: got ${data.length} products');
       if (mounted) setState(() { _featured = data; _featuredLoading = false; });
@@ -77,7 +76,6 @@ class _HomeScreenState extends State<HomeScreen> {
       debugPrint('[Home] fetchBestSelling: starting');
       final res = await CustomerService.getProducts(sort: 'best_seller', limit: 6);
       final raw = res['data'];
-      debugPrint('[Home] fetchBestSelling: raw type=${raw.runtimeType}');
       final data = _parseProductList(raw);
       debugPrint('[Home] fetchBestSelling: got ${data.length} products');
       if (mounted) setState(() { _bestSelling = data; _bestSellingLoading = false; });
@@ -107,7 +105,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Safely converts any API list response to List<Map<String,dynamic>>.
   List<Map<String, dynamic>> _parseProductList(dynamic raw) {
     if (raw == null) return [];
     if (raw is! List) return [];
@@ -120,66 +117,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
     return result;
-  }
-
-  Widget _buildDebugBar(String section, bool loading, String? error, int count) {
-    final Color bg;
-    final String statusLine;
-    final String? detailLine;
-
-    if (loading) {
-      bg = const Color(0xFFE3F2FD);
-      statusLine = 'Status: Loading...';
-      detailLine = null;
-    } else if (error != null) {
-      bg = const Color(0xFFFFEBEE);
-      statusLine = 'Status: Error';
-      detailLine = 'Message: $error';
-    } else if (count == 0) {
-      bg = const Color(0xFFFFF8E1);
-      statusLine = 'Status: Loaded';
-      detailLine = 'Products: 0 — no active products returned';
-    } else {
-      bg = const Color(0xFFE8F5E9);
-      statusLine = 'Status: Loaded';
-      detailLine = 'Products: $count';
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: bg.withValues(alpha: 0.8)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '$section Debug',
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF444444),
-                fontFamily: 'monospace',
-              ),
-            ),
-            Text(
-              statusLine,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF222222), fontFamily: 'monospace'),
-            ),
-            if (detailLine != null)
-              Text(
-                detailLine,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF222222), fontFamily: 'monospace'),
-              ),
-          ],
-        ),
-      ),
-    );
   }
 
   Future<void> _onRefresh() async {
@@ -226,9 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const ProductListingScreen())),
                   ),
-                  const SizedBox(height: 6),
-                  _buildDebugBar('Best Selling', _bestSellingLoading, _bestSellingError, _bestSelling.length),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 12),
                   _buildProductRow(
                     context,
                     items: _bestSelling,
@@ -243,9 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const ProductListingScreen())),
                   ),
-                  const SizedBox(height: 6),
-                  _buildDebugBar('Featured Products', _featuredLoading, _featuredError, _featured.length),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 12),
                   _buildProductRow(
                     context,
                     items: _featured,
@@ -282,26 +215,18 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             TextSpan(
               text: 'Q',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                color: AppColors.secondary,
-              ),
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.secondary),
             ),
             TextSpan(
               text: ' Cart',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
             ),
           ],
         ),
       ),
       actions: [
         TextButton(
-          onPressed: () => LocaleService.toggle(),
+          onPressed: LocaleService.toggle,
           style: TextButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             minimumSize: Size.zero,
@@ -315,11 +240,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: Text(
               LocaleService.isArabic ? 'EN' : 'AR',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
             ),
           ),
         ),
@@ -329,10 +250,7 @@ class _HomeScreenState extends State<HomeScreen> {
           color: AppColors.textPrimary,
         ),
         IconButton(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CartScreen()),
-          ),
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen())),
           icon: const Icon(Icons.shopping_cart_outlined),
           color: AppColors.textPrimary,
         ),
@@ -345,10 +263,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: GestureDetector(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const ProductListingScreen()),
-        ),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductListingScreen())),
         child: Container(
           height: 50,
           decoration: BoxDecoration(
@@ -363,10 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 10),
               Text(
                 LocaleService.t('search_hint'),
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 14,
-                ),
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
               ),
             ],
           ),
@@ -405,86 +317,48 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     child: Text(
                       LocaleService.t('limited_offer'),
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     LocaleService.t('promo_title'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700, height: 1.2),
                   ),
                   const SizedBox(height: 12),
                   GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const ProductListingScreen()),
-                    ),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductListingScreen())),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                      decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20)),
                       child: Text(
                         LocaleService.t('shop_now'),
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(
-              Icons.local_offer_outlined,
-              size: 72,
-              color: Colors.white24,
-            ),
+            const Icon(Icons.local_offer_outlined, size: 72, color: Colors.white24),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSectionHeader(
-    BuildContext context,
-    String title, {
-    required VoidCallback onTap,
-  }) {
+  Widget _buildSectionHeader(BuildContext context, String title, {required VoidCallback onTap}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
+          Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           GestureDetector(
             onTap: onTap,
             child: Text(
               LocaleService.t('see_all'),
-              style: const TextStyle(
-                color: AppColors.secondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
+              style: const TextStyle(color: AppColors.secondary, fontSize: 13, fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -495,13 +369,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCategoriesRow(BuildContext context) {
     if (_categoriesLoading) {
       return const SizedBox(
-        height: 88,
+        height: 102,
         child: Center(child: CircularProgressIndicator(color: AppColors.secondary)),
       );
     }
     if (_categoriesError != null) {
       return SizedBox(
-        height: 88,
+        height: 102,
         child: Center(
           child: TextButton.icon(
             onPressed: _fetchCategories,
@@ -514,67 +388,67 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     final displayCategories = _categories.take(8).toList();
     return SizedBox(
-      height: 88,
+      height: 102,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
         itemCount: displayCategories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (_, __) => const SizedBox(width: 14),
         itemBuilder: (context, index) {
           final cat = displayCategories[index];
+          final name = cat['name']?.toString() ?? '';
           final imageUrl = cat['image_url']?.toString();
+          final icon = _categoryIcon(name);
+          final iconColor = _categoryIconColor(name);
+          final bgColor = _categoryBgColor(name);
           return GestureDetector(
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => ProductListingScreen(
                   categoryId: cat['id']?.toString(),
-                  categoryName: cat['name']?.toString(),
+                  categoryName: name,
                 ),
               ),
             ),
-            child: Column(
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.divider),
+            child: SizedBox(
+              width: 72,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: imageUrl != null && imageUrl.isNotEmpty
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(18),
+                            child: Image.network(
+                              imageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Icon(icon, color: iconColor, size: 28),
+                            ),
+                          )
+                        : Icon(icon, color: iconColor, size: 28),
                   ),
-                  child: imageUrl != null && imageUrl.isNotEmpty
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(15),
-                          child: Image.network(imageUrl, fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                    Icons.category_outlined,
-                                    color: AppColors.secondary,
-                                    size: 26,
-                                  )),
-                        )
-                      : const Icon(
-                          Icons.category_outlined,
-                          color: AppColors.secondary,
-                          size: 26,
-                        ),
-                ),
-                const SizedBox(height: 6),
-                SizedBox(
-                  width: 56,
-                  child: Text(
-                    cat['name']?.toString() ?? '',
+                  const SizedBox(height: 6),
+                  Text(
+                    name,
                     style: const TextStyle(
                       fontSize: 11,
                       color: AppColors.textSecondary,
                       fontWeight: FontWeight.w500,
+                      height: 1.2,
                     ),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },
@@ -589,15 +463,16 @@ class _HomeScreenState extends State<HomeScreen> {
     required String? error,
     required VoidCallback onRetry,
   }) {
+    const rowHeight = 252.0;
     if (loading) {
       return const SizedBox(
-        height: 210,
+        height: rowHeight,
         child: Center(child: CircularProgressIndicator(color: AppColors.secondary)),
       );
     }
     if (error != null) {
       return SizedBox(
-        height: 210,
+        height: rowHeight,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -611,11 +486,11 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Server may be starting up — tap retry',
+                'Server may be starting up — tap Retry',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               ElevatedButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh, size: 16),
@@ -635,7 +510,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (items.isEmpty) {
       return SizedBox(
-        height: 210,
+        height: rowHeight,
         child: Center(
           child: Text(LocaleService.t('no_products'),
               style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
@@ -643,7 +518,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
     return SizedBox(
-      height: 210,
+      height: rowHeight,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
@@ -654,9 +529,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => ProductDetailsScreen(
-                productId: items[index]['id']?.toString() ?? '',
-              ),
+              builder: (_) => ProductDetailsScreen(productId: items[index]['id']?.toString() ?? ''),
             ),
           ),
         ),
@@ -678,11 +551,9 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                _newArrivalsError!,
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                textAlign: TextAlign.center,
-              ),
+              Text(_newArrivalsError!,
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  textAlign: TextAlign.center),
               const SizedBox(height: 8),
               TextButton.icon(
                 onPressed: _fetchNewArrivals,
@@ -698,10 +569,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_newArrivals.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Text(
-          LocaleService.t('no_products'),
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-        ),
+        child: Text(LocaleService.t('no_products'),
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
       );
     }
     return Padding(
@@ -711,7 +580,7 @@ class _HomeScreenState extends State<HomeScreen> {
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          childAspectRatio: 0.72,
+          childAspectRatio: 0.70,
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
         ),
@@ -721,9 +590,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => ProductDetailsScreen(
-                productId: _newArrivals[index]['id']?.toString() ?? '',
-              ),
+              builder: (_) => ProductDetailsScreen(productId: _newArrivals[index]['id']?.toString() ?? ''),
             ),
           ),
         ),
@@ -731,6 +598,80 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
+// ── Category icon / colour helpers ───────────────────────────────────────────
+
+IconData _categoryIcon(String name) {
+  final n = name.toLowerCase();
+  if (n.contains('electron') || n.contains('tech') || n.contains('phone') ||
+      n.contains('computer') || n.contains('gadget') || n.contains('device')) {
+    return Icons.devices_outlined;
+  }
+  if (n.contains('cloth') || n.contains('fashion') || n.contains('apparel') ||
+      n.contains('wear') || n.contains('dress') || n.contains('shirt')) {
+    return Icons.checkroom_outlined;
+  }
+  if (n.contains('food') || n.contains('grocer') || n.contains('supermarket') ||
+      n.contains('fruit') || n.contains('vegetable') || n.contains('fresh')) {
+    return Icons.local_grocery_store_outlined;
+  }
+  if (n.contains('beauty') || n.contains('care') || n.contains('cosmetic') ||
+      n.contains('personal') || n.contains('skin') || n.contains('makeup')) {
+    return Icons.face_retouching_natural;
+  }
+  if (n.contains('home') || n.contains('kitchen') || n.contains('furniture') ||
+      n.contains('decor') || n.contains('appliance') || n.contains('household')) {
+    return Icons.kitchen_outlined;
+  }
+  if (n.contains('sport') || n.contains('fitness') || n.contains('gym') ||
+      n.contains('outdoor') || n.contains('exercise')) {
+    return Icons.fitness_center_outlined;
+  }
+  if (n.contains('toy') || n.contains('game') || n.contains('kids') || n.contains('baby')) {
+    return Icons.toys_outlined;
+  }
+  if (n.contains('book') || n.contains('stationery') || n.contains('office')) {
+    return Icons.menu_book_outlined;
+  }
+  if (n.contains('health') || n.contains('medical') || n.contains('pharma') ||
+      n.contains('wellness')) {
+    return Icons.local_pharmacy_outlined;
+  }
+  if (n.contains('auto') || n.contains('car') || n.contains('vehicle') || n.contains('motor')) {
+    return Icons.directions_car_outlined;
+  }
+  return Icons.category_outlined;
+}
+
+Color _categoryIconColor(String name) {
+  final n = name.toLowerCase();
+  if (n.contains('electron') || n.contains('tech') || n.contains('phone') || n.contains('computer')) return const Color(0xFF2563EB);
+  if (n.contains('cloth') || n.contains('fashion') || n.contains('apparel')) return const Color(0xFFDB2777);
+  if (n.contains('food') || n.contains('grocer') || n.contains('fresh')) return const Color(0xFF059669);
+  if (n.contains('beauty') || n.contains('care') || n.contains('cosmetic')) return const Color(0xFF7C3AED);
+  if (n.contains('home') || n.contains('kitchen') || n.contains('furniture')) return const Color(0xFFD97706);
+  if (n.contains('sport') || n.contains('fitness')) return const Color(0xFFDC2626);
+  if (n.contains('toy') || n.contains('kids')) return const Color(0xFFEA580C);
+  if (n.contains('book') || n.contains('stationery')) return const Color(0xFF4F46E5);
+  if (n.contains('health') || n.contains('pharma')) return const Color(0xFF0D9488);
+  return AppColors.secondary;
+}
+
+Color _categoryBgColor(String name) {
+  final n = name.toLowerCase();
+  if (n.contains('electron') || n.contains('tech') || n.contains('phone') || n.contains('computer')) return const Color(0xFFEFF6FF);
+  if (n.contains('cloth') || n.contains('fashion') || n.contains('apparel')) return const Color(0xFFFCE7F3);
+  if (n.contains('food') || n.contains('grocer') || n.contains('fresh')) return const Color(0xFFECFDF5);
+  if (n.contains('beauty') || n.contains('care') || n.contains('cosmetic')) return const Color(0xFFF5F3FF);
+  if (n.contains('home') || n.contains('kitchen') || n.contains('furniture')) return const Color(0xFFFFFBEB);
+  if (n.contains('sport') || n.contains('fitness')) return const Color(0xFFFEF2F2);
+  if (n.contains('toy') || n.contains('kids')) return const Color(0xFFFFF7ED);
+  if (n.contains('book') || n.contains('stationery')) return const Color(0xFFEEF2FF);
+  if (n.contains('health') || n.contains('pharma')) return const Color(0xFFF0FDFA);
+  return const Color(0xFFF0FDF4);
+}
+
+// ── Product image extraction ─────────────────────────────────────────────────
 
 String? _extractImageUrl(Map<String, dynamic> product) {
   final raw = product['images'];
@@ -741,11 +682,10 @@ String? _extractImageUrl(Map<String, dynamic> product) {
   return null;
 }
 
+// ── Product card ─────────────────────────────────────────────────────────────
+
 class _ProductCard extends StatelessWidget {
-  const _ProductCard({
-    required this.product,
-    required this.onTap,
-  });
+  const _ProductCard({required this.product, required this.onTap});
 
   final Map<String, dynamic> product;
   final VoidCallback onTap;
@@ -761,29 +701,39 @@ class _ProductCard extends StatelessWidget {
   }
 
   Widget _buildCard(BuildContext context) {
-    final name = product['name']?.toString() ?? '';
-    final price = parseDouble(product['price']);
-    final priceStr = '${LocaleService.t('qar')} ${price.toStringAsFixed(2)}';
-    final imageUrl = _extractImageUrl(product);
+    final name        = product['name']?.toString() ?? '';
+    final price       = parseDouble(product['price']);
+    final rating      = parseDouble(product['average_rating']);
+    final reviewCount = parseInt(product['review_count']);
+    final priceStr    = '${LocaleService.t('qar')} ${price.toStringAsFixed(2)}';
+    final imageUrl    = _extractImageUrl(product);
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 148,
+        width: 168,
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.divider),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Image ──────────────────────────────────────────────────────
             Stack(
               children: [
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                   child: SizedBox(
-                    height: 110,
+                    height: 130,
                     width: double.infinity,
                     child: imageUrl != null
                         ? Image.network(
@@ -800,8 +750,8 @@ class _ProductCard extends StatelessWidget {
                   top: 8,
                   right: 8,
                   child: Container(
-                    width: 30,
-                    height: 30,
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
@@ -813,17 +763,14 @@ class _ProductCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.favorite_border,
-                      size: 16,
-                      color: AppColors.textSecondary,
-                    ),
+                    child: const Icon(Icons.favorite_border, size: 16, color: AppColors.textSecondary),
                   ),
                 ),
               ],
             ),
+            // ── Info ───────────────────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -833,11 +780,32 @@ class _ProductCard extends StatelessWidget {
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
+                      height: 1.3,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 5),
+                  // Rating
+                  Row(
+                    children: [
+                      const Icon(Icons.star_rounded, size: 13, color: Color(0xFFFBBF24)),
+                      const SizedBox(width: 3),
+                      Text(
+                        rating > 0 ? rating.toStringAsFixed(1) : '—',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                      ),
+                      if (reviewCount > 0) ...[
+                        const SizedBox(width: 3),
+                        Text(
+                          '($reviewCount)',
+                          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Price + Add
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -852,14 +820,15 @@ class _ProductCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(width: 6),
                       Container(
-                        width: 28,
-                        height: 28,
+                        width: 30,
+                        height: 30,
                         decoration: BoxDecoration(
                           color: AppColors.secondary,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(9),
                         ),
-                        child: const Icon(Icons.add, color: Colors.white, size: 16),
+                        child: const Icon(Icons.add, color: Colors.white, size: 17),
                       ),
                     ],
                   ),
@@ -874,7 +843,7 @@ class _ProductCard extends StatelessWidget {
 
   Widget _errorCard() {
     return Container(
-      width: 148,
+      width: 168,
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
@@ -888,19 +857,9 @@ class _ProductCard extends StatelessWidget {
 
   Widget _placeholder() {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFD4F5E9), AppColors.primary],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
+      color: const Color(0xFFF8FAFC),
       child: const Center(
-        child: Icon(
-          Icons.shopping_basket_outlined,
-          size: 44,
-          color: AppColors.secondary,
-        ),
+        child: Icon(Icons.shopping_bag_outlined, size: 40, color: Color(0xFFCBD5E1)),
       ),
     );
   }
