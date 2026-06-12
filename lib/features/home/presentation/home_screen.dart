@@ -55,12 +55,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchFeatured() async {
     setState(() { _featuredLoading = true; _featuredError = null; });
     try {
+      debugPrint('[Home] fetchFeatured: starting');
       final res = await CustomerService.getProducts(featured: true, limit: 6);
-      final data = (res['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+      final raw = res['data'];
+      debugPrint('[Home] fetchFeatured: raw type=${raw.runtimeType}');
+      final data = _parseProductList(raw);
+      debugPrint('[Home] fetchFeatured: got ${data.length} products');
       if (mounted) setState(() { _featured = data; _featuredLoading = false; });
     } on ApiException catch (e) {
+      debugPrint('[Home] fetchFeatured: ApiException ${e.statusCode} ${e.message}');
       if (mounted) setState(() { _featuredError = e.message; _featuredLoading = false; });
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('[Home] fetchFeatured: error $e\n$st');
       if (mounted) setState(() { _featuredError = LocaleService.t('error_generic'); _featuredLoading = false; });
     }
   }
@@ -68,12 +74,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchBestSelling() async {
     setState(() { _bestSellingLoading = true; _bestSellingError = null; });
     try {
+      debugPrint('[Home] fetchBestSelling: starting');
       final res = await CustomerService.getProducts(sort: 'best_seller', limit: 6);
-      final data = (res['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+      final raw = res['data'];
+      debugPrint('[Home] fetchBestSelling: raw type=${raw.runtimeType}');
+      final data = _parseProductList(raw);
+      debugPrint('[Home] fetchBestSelling: got ${data.length} products');
       if (mounted) setState(() { _bestSelling = data; _bestSellingLoading = false; });
     } on ApiException catch (e) {
+      debugPrint('[Home] fetchBestSelling: ApiException ${e.statusCode} ${e.message}');
       if (mounted) setState(() { _bestSellingError = e.message; _bestSellingLoading = false; });
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('[Home] fetchBestSelling: error $e\n$st');
       if (mounted) setState(() { _bestSellingError = LocaleService.t('error_generic'); _bestSellingLoading = false; });
     }
   }
@@ -81,14 +93,33 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchNewArrivals() async {
     setState(() { _newArrivalsLoading = true; _newArrivalsError = null; });
     try {
+      debugPrint('[Home] fetchNewArrivals: starting');
       final res = await CustomerService.getProducts(sort: 'newest', limit: 8);
-      final data = (res['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+      final raw = res['data'];
+      final data = _parseProductList(raw);
+      debugPrint('[Home] fetchNewArrivals: got ${data.length} products');
       if (mounted) setState(() { _newArrivals = data; _newArrivalsLoading = false; });
     } on ApiException catch (e) {
       if (mounted) setState(() { _newArrivalsError = e.message; _newArrivalsLoading = false; });
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('[Home] fetchNewArrivals: error $e\n$st');
       if (mounted) setState(() { _newArrivalsError = LocaleService.t('error_generic'); _newArrivalsLoading = false; });
     }
+  }
+
+  // Safely converts any API list response to List<Map<String,dynamic>>.
+  List<Map<String, dynamic>> _parseProductList(dynamic raw) {
+    if (raw == null) return [];
+    if (raw is! List) return [];
+    final result = <Map<String, dynamic>>[];
+    for (final item in raw) {
+      if (item is Map<String, dynamic>) {
+        result.add(item);
+      } else if (item is Map) {
+        result.add(Map<String, dynamic>.from(item));
+      }
+    }
+    return result;
   }
 
   Future<void> _onRefresh() async {
@@ -305,7 +336,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.25),
+                      color: AppColors.primary.withValues(alpha: 0.25),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -657,6 +688,15 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    try {
+      return _buildCard(context);
+    } catch (e) {
+      debugPrint('[ProductCard] build error: $e');
+      return _errorCard();
+    }
+  }
+
+  Widget _buildCard(BuildContext context) {
     final name = product['name']?.toString() ?? '';
     final price = parseDouble(product['price']);
     final priceStr = '${LocaleService.t('qar')} ${price.toStringAsFixed(2)}';
@@ -685,6 +725,8 @@ class _ProductCard extends StatelessWidget {
                         ? Image.network(
                             imageUrl,
                             fit: BoxFit.cover,
+                            loadingBuilder: (_, child, progress) =>
+                                progress == null ? child : _placeholder(),
                             errorBuilder: (_, __, ___) => _placeholder(),
                           )
                         : _placeholder(),
@@ -701,7 +743,7 @@ class _ProductCard extends StatelessWidget {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
+                          color: Colors.black.withValues(alpha: 0.08),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -735,12 +777,15 @@ class _ProductCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        priceStr,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.secondary,
+                      Flexible(
+                        child: Text(
+                          priceStr,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.secondary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       Container(
@@ -759,6 +804,20 @@ class _ProductCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _errorCard() {
+    return Container(
+      width: 148,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: const Center(
+        child: Icon(Icons.error_outline, color: AppColors.textSecondary, size: 32),
       ),
     );
   }

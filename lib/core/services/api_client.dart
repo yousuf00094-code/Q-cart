@@ -25,7 +25,7 @@ class ApiClient {
   static Future<Map<String, dynamic>> get(String path) async {
     final response = await http
         .get(Uri.parse('$baseUrl$path'), headers: _getHeaders)
-        .timeout(const Duration(seconds: 30));
+        .timeout(const Duration(seconds: 60));
     return _handle(response);
   }
 
