@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/environment.dart';
+import 'mock_api_client.dart';
 
 class ApiClient {
   static String get baseUrl => AppEnvironment.apiBaseUrl;
@@ -23,6 +24,7 @@ class ApiClient {
   };
 
   static Future<Map<String, dynamic>> get(String path) async {
+    if (AppEnvironment.useMockData) return _mockHandle('GET', path, null);
     final response = await http
         .get(Uri.parse('$baseUrl$path'), headers: _getHeaders)
         .timeout(const Duration(seconds: 60));
@@ -30,6 +32,7 @@ class ApiClient {
   }
 
   static Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body) async {
+    if (AppEnvironment.useMockData) return _mockHandle('POST', path, body);
     final response = await http.post(
       Uri.parse('$baseUrl$path'),
       headers: _headers,
@@ -39,6 +42,7 @@ class ApiClient {
   }
 
   static Future<Map<String, dynamic>> put(String path, Map<String, dynamic> body) async {
+    if (AppEnvironment.useMockData) return _mockHandle('PUT', path, body);
     final response = await http.put(
       Uri.parse('$baseUrl$path'),
       headers: _headers,
@@ -48,6 +52,7 @@ class ApiClient {
   }
 
   static Future<Map<String, dynamic>> patch(String path, Map<String, dynamic> body) async {
+    if (AppEnvironment.useMockData) return _mockHandle('PATCH', path, body);
     final response = await http.patch(
       Uri.parse('$baseUrl$path'),
       headers: _headers,
@@ -57,8 +62,30 @@ class ApiClient {
   }
 
   static Future<void> delete(String path) async {
+    if (AppEnvironment.useMockData) {
+      final result = MockApiClient.handle('DELETE', path, null);
+      _checkMockError(result);
+      return;
+    }
     final response = await http.delete(Uri.parse('$baseUrl$path'), headers: _headers);
     _handle(response);
+  }
+
+  static Map<String, dynamic> _mockHandle(
+      String method, String path, Map<String, dynamic>? body) {
+    final result = MockApiClient.handle(method, path, body);
+    _checkMockError(result);
+    return result;
+  }
+
+  static void _checkMockError(Map<String, dynamic> result) {
+    if (result['__mock_error__'] == true) {
+      throw ApiException(
+        message: result['message']?.toString() ?? 'Error',
+        code: result['code']?.toString() ?? 'ERROR',
+        statusCode: result['statusCode'] as int? ?? 500,
+      );
+    }
   }
 
   static Future<Map<String, dynamic>> uploadFile(
