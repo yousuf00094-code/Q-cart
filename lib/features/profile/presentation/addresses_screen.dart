@@ -25,8 +25,8 @@ class _AddressesScreenState extends State<AddressesScreen> {
     try {
       final data = await CustomerService.getAddresses();
       if (mounted) setState(() { _addresses = List<Map<String, dynamic>>.from(data); _loading = false; });
-    } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() { _error = LocaleService.t('error_generic'); _loading = false; });
     }
   }
 
@@ -49,8 +49,8 @@ class _AddressesScreenState extends State<AddressesScreen> {
     try {
       await CustomerService.deleteAddress(id);
       if (mounted) setState(() => _addresses.removeWhere((a) => a['id'] == id));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocaleService.t('error_generic'))));
     }
   }
 
@@ -58,8 +58,8 @@ class _AddressesScreenState extends State<AddressesScreen> {
     try {
       await CustomerService.setDefaultAddress(id);
       await _load();
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocaleService.t('error_generic'))));
     }
   }
 
@@ -107,9 +107,9 @@ class _AddressesScreenState extends State<AddressesScreen> {
                 ? Center(child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(_error!, style: const TextStyle(color: Color(0xFF6B6B7B))),
+                      Text(LocaleService.t('error_generic'), style: const TextStyle(color: Color(0xFF6B6B7B))),
                       const SizedBox(height: 12),
-                      TextButton(onPressed: _load, child: const Text('Retry')),
+                      TextButton(onPressed: _load, child: Text(LocaleService.t('retry'))),
                     ],
                   ))
                 : _addresses.isEmpty
@@ -207,7 +207,7 @@ class _AddressCard extends StatelessWidget {
         border: isDefault
             ? Border.all(color: const Color(0xFF6C63FF), width: 1.5)
             : null,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -226,7 +226,7 @@ class _AddressCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6C63FF).withOpacity(0.1),
+                      color: const Color(0xFF6C63FF).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -304,7 +304,7 @@ class _ActionButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -388,8 +388,8 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
         Navigator.pop(context);
         widget.onSaved();
       }
-    } catch (e) {
-      if (mounted) setState(() { _saving = false; _error = e.toString(); });
+    } catch (_) {
+      if (mounted) setState(() { _saving = false; _error = LocaleService.t('error_generic'); });
     }
   }
 

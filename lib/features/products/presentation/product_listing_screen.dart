@@ -4,6 +4,7 @@ import '../../../core/services/customer_service.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/services/locale_service.dart';
 import '../../../core/utils/parse_num.dart';
+import '../../../core/utils/category_helpers.dart';
 import '../../products/presentation/product_details_screen.dart';
 
 class ProductListingScreen extends StatefulWidget {
@@ -94,7 +95,10 @@ class _ProductListingScreenState extends State<ProductListingScreen> {
         maxPrice: _maxPrice < 1000 ? _maxPrice : null,
         sort: _sort,
       );
-      final data = (res['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+      final rawList = res['data'];
+      final data = rawList is List
+          ? rawList.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+          : <Map<String, dynamic>>[];
       final meta = res['meta'] as Map<String, dynamic>?;
       final pages = parseInt(meta?['total_pages'], 1);
       if (mounted) {
@@ -139,7 +143,10 @@ class _ProductListingScreenState extends State<ProductListingScreen> {
         maxPrice: _maxPrice < 1000 ? _maxPrice : null,
         sort: _sort,
       );
-      final data = (res['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+      final rawList = res['data'];
+      final data = rawList is List
+          ? rawList.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+          : <Map<String, dynamic>>[];
       final meta = res['meta'] as Map<String, dynamic>?;
       final pages = parseInt(meta?['total_pages'], _totalPages);
       if (mounted) {
@@ -274,7 +281,7 @@ class _ProductListingScreenState extends State<ProductListingScreen> {
               const Icon(Icons.error_outline, size: 48, color: AppColors.textSecondary),
               const SizedBox(height: 12),
               Text(
-                _error!,
+                LocaleService.t('error_generic'),
                 style: const TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 14,
@@ -567,19 +574,10 @@ String? _extractImageUrl(Map<String, dynamic> product) {
 }
 
 Widget _gridImageFallback() {
-  return Container(
+  return SizedBox(
     height: 130,
     width: double.infinity,
-    decoration: const BoxDecoration(
-      gradient: LinearGradient(
-        colors: [Color(0xFFD4F5E9), AppColors.primary],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-    ),
-    child: const Center(
-      child: Icon(Icons.shopping_basket_outlined, size: 48, color: AppColors.secondary),
-    ),
+    child: productImagePlaceholder(),
   );
 }
 
@@ -592,17 +590,17 @@ class _ProductGridCard extends StatelessWidget {
   final Map<String, dynamic> product;
   final VoidCallback onTap;
 
-  String _badge() {
+  String _badgeKey() {
     final tags = product['tags'] as List<dynamic>?;
-    if (tags != null && tags.contains('best_seller')) return 'Best Seller';
+    if (tags != null && tags.contains('best_seller')) return 'best_seller';
     final compareAt = parseDoubleOrNull(product['compare_at_price']);
     final price = parseDouble(product['price']);
-    if (compareAt != null && compareAt > price) return 'Sale';
+    if (compareAt != null && compareAt > price) return 'sale';
     final createdAt = product['created_at'] as String?;
     if (createdAt != null) {
       try {
         final created = DateTime.parse(createdAt);
-        if (DateTime.now().difference(created).inDays <= 30) return 'New';
+        if (DateTime.now().difference(created).inDays <= 30) return 'new_label';
       } catch (_) {}
     }
     return '';
@@ -614,7 +612,7 @@ class _ProductGridCard extends StatelessWidget {
     final price = parseDouble(product['price']);
     final compareAt = parseDoubleOrNull(product['compare_at_price']);
     final priceStr = '${LocaleService.t('qar')} ${price.toStringAsFixed(2)}';
-    final badge = _badge();
+    final badgeKey = _badgeKey();
     final imageUrl = _extractImageUrl(product);
 
     return GestureDetector(
@@ -644,22 +642,22 @@ class _ProductGridCard extends StatelessWidget {
                         )
                       : _gridImageFallback(),
                 ),
-                if (badge.isNotEmpty)
+                if (badgeKey.isNotEmpty)
                   Positioned(
                     top: 8,
                     left: 8,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: badge == 'Sale'
+                        color: badgeKey == 'sale'
                             ? const Color(0xFFE53935)
-                            : badge == 'New'
+                            : badgeKey == 'new_label'
                                 ? AppColors.secondary
                                 : const Color(0xFF2E7D32),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        badge,
+                        LocaleService.t(badgeKey),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 9,

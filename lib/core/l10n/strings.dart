@@ -197,6 +197,12 @@ class AppStrings {
     'back':           {'en': 'Back',           'ar': 'رجوع'},
     'done':           {'en': 'Done',           'ar': 'تم'},
     'search':         {'en': 'Search',         'ar': 'بحث'},
+    'show_more':      {'en': 'Show more',      'ar': 'عرض المزيد'},
+    'show_less':      {'en': 'Show less',      'ar': 'عرض أقل'},
+    'go_to_cart':     {'en': 'Go to Cart',     'ar': 'عرض السلة'},
+    'coupon_applied': {'en': 'Coupon applied', 'ar': 'تم تطبيق القسيمة'},
+    'sale':           {'en': 'Sale',           'ar': 'تخفيض'},
+    'new_label':      {'en': 'New',            'ar': 'جديد'},
   };
 
   static String t(String key, String langCode) =>
