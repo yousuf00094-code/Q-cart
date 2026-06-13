@@ -140,6 +140,26 @@ class MockApiClient {
     return _notFound(path);
   }
 
+  // ── Product image generation ─────────────────────────────────────────────
+
+  static String _productImage(String catId, int n, bool flip) {
+    final variant = flip ? 1 : 0;
+    return '/img/${catId}_$variant.png';
+  }
+
+  static Map<String, dynamic> _withImages(Map<String, dynamic> p) {
+    final catId = p['category_id'] as String? ?? 'cat_1';
+    final n = int.tryParse((p['id'] as String? ?? 'p1').replaceFirst('p', '')) ?? 1;
+    final productForCart = {
+      ...p,
+      'images': <dynamic>[
+        _productImage(catId, n, false),
+        _productImage(catId, n, true),
+      ],
+    };
+    return productForCart;
+  }
+
   // ── Products ─────────────────────────────────────────────────────────────
 
   static Map<String, dynamic> _listProducts(Map<String, String> q) {
@@ -211,7 +231,7 @@ class MockApiClient {
     final totalPages = (total / limit).ceil().clamp(1, 999);
     final start = ((page - 1) * limit).clamp(0, total);
     final end = (start + limit).clamp(0, total);
-    final pageItems = items.sublist(start, end);
+    final pageItems = items.sublist(start, end).map(_withImages).toList();
 
     return {
       'data': pageItems,
@@ -229,7 +249,7 @@ class MockApiClient {
     if (product == null) {
       return _error(404, 'NOT_FOUND', 'Product not found');
     }
-    return {'data': product};
+    return {'data': _withImages(product)};
   }
 
   static Map<String, dynamic> _getReviews(String productId, Map<String, String> q) {
@@ -276,16 +296,17 @@ class MockApiClient {
       return _error(404, 'NOT_FOUND', 'Product not found');
     }
 
+    final enriched = _withImages(product);
     _cartItems.add({
       'id': 'ci_${_cartItemCounter++}',
       'product_id': productId,
       'quantity': quantity,
       'product': {
-        'id': product['id'],
-        'name': product['name'],
-        'price': product['price'],
-        'images': product['images'],
-        'category_id': product['category_id'],
+        'id': enriched['id'],
+        'name': enriched['name'],
+        'price': enriched['price'],
+        'images': enriched['images'],
+        'category_id': enriched['category_id'],
       },
     });
 
@@ -328,15 +349,16 @@ class MockApiClient {
     if (product == null) {
       return _error(404, 'NOT_FOUND', 'Product not found');
     }
+    final enrichedW = _withImages(product);
     _wishlistItems.add({
       'id': 'wl_${_wishlistItemCounter++}',
       'product_id': productId,
       'product': {
-        'id': product['id'],
-        'name': product['name'],
-        'price': product['price'],
-        'images': product['images'],
-        'created_at': product['created_at'],
+        'id': enrichedW['id'],
+        'name': enrichedW['name'],
+        'price': enrichedW['price'],
+        'images': enrichedW['images'],
+        'created_at': enrichedW['created_at'],
       },
     });
     return {'data': null};
