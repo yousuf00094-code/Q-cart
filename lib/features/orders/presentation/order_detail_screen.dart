@@ -174,7 +174,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(_error!, style: const TextStyle(color: AppColors.textSecondary)),
+          Text(LocaleService.t('error_generic'), style: const TextStyle(color: AppColors.textSecondary)),
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: _loadOrder,

@@ -127,7 +127,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           width: isSelected ? 2 : 1,
         ),
       ),
-      tileColor: isSelected ? AppColors.secondary.withOpacity(0.05) : AppColors.surface,
+      tileColor: isSelected ? AppColors.secondary.withValues(alpha: 0.05) : AppColors.surface,
       title: Text(
         label,
         style: TextStyle(

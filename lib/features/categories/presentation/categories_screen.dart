@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/services/customer_service.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/services/locale_service.dart';
+import '../../../core/utils/category_helpers.dart';
 import '../../products/presentation/product_listing_screen.dart';
 
 class CategoriesScreen extends StatefulWidget {
@@ -118,7 +119,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               const Icon(Icons.error_outline, size: 48, color: AppColors.textSecondary),
               const SizedBox(height: 12),
               Text(
-                _error!,
+                LocaleService.t('error_generic'),
                 style: const TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 14,
@@ -212,6 +213,8 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final icon = categoryIcon(label);
+    final iconColor = categoryIconColor(label);
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -228,12 +231,12 @@ class _CategoryCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(
-                Icons.category_outlined,
-                color: AppColors.secondary,
+              child: Icon(
+                icon,
+                color: iconColor,
                 size: 26,
               ),
             ),
@@ -253,7 +256,7 @@ class _CategoryCard extends StatelessWidget {
                 if (productCount != null) ...[
                   const SizedBox(height: 2),
                   Text(
-                    '$productCount items',
+                    '$productCount ${LocaleService.t('items')}',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,

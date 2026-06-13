@@ -203,7 +203,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(_error!, style: const TextStyle(color: AppColors.textSecondary)),
+          Text(LocaleService.t('error_generic'), style: const TextStyle(color: AppColors.textSecondary)),
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: _loadOrders,
@@ -468,7 +468,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: _statusColor(status).withOpacity(0.1),
+        color: _statusColor(status).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(

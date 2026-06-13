@@ -7,6 +7,7 @@ import '../../../core/services/auth_service.dart';
 import '../../../core/services/locale_service.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/utils/parse_num.dart';
+import '../../../core/utils/category_helpers.dart';
 import '../../../app_shell.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
@@ -65,9 +66,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       });
       _loadReviews();
       _checkWishlist();
-    } catch (e) {
+    } on ApiException catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = e.message;
+        _loading = false;
+      });
+    } catch (_) {
+      setState(() {
+        _error = LocaleService.t('error_generic');
         _loading = false;
       });
     }
@@ -473,7 +479,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.08),
+                color: Colors.black.withValues(alpha: 0.08),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -493,7 +499,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -530,7 +536,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.08),
+                color: Colors.black.withValues(alpha: 0.08),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -580,7 +586,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     decoration: BoxDecoration(
                       color: _currentImageIndex == i
                           ? AppColors.secondary
-                          : Colors.white.withOpacity(0.6),
+                          : Colors.white.withValues(alpha: 0.6),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   );
@@ -593,24 +599,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     );
   }
 
-  Widget _imagePlaceholder() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFD4F5E9), Color(0xFFA8E0D0)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: const Center(
-        child: Icon(
-          Icons.shopping_basket_outlined,
-          size: 100,
-          color: Colors.white54,
-        ),
-      ),
-    );
-  }
+  Widget _imagePlaceholder() => productImagePlaceholder();
 
   Widget _buildTagRow(
       String? categoryName, bool isSale, bool isActive) {
@@ -692,7 +681,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 '${LocaleService.t('qar')} ${comparePrice.toStringAsFixed(2)}',
                 style: TextStyle(
                   fontSize: 14,
-                  color: AppColors.textSecondary.withOpacity(0.7),
+                  color: AppColors.textSecondary.withValues(alpha: 0.7),
                   decoration: TextDecoration.lineThrough,
                 ),
               ),
@@ -770,7 +759,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             onTap: () =>
                 setState(() => _descExpanded = !_descExpanded),
             child: Text(
-              _descExpanded ? 'Show less' : 'Show more',
+              _descExpanded
+                  ? LocaleService.t('show_less')
+                  : LocaleService.t('show_more'),
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -849,7 +840,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   border: Border.all(color: AppColors.divider),
                 ),
                 child: Text(
-                  'See all $_reviewTotalCount ${LocaleService.t('reviews')}',
+                  '${LocaleService.t('see_all')} $_reviewTotalCount ${LocaleService.t('reviews')}',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 13,
@@ -920,7 +911,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 backgroundColor: AppColors.secondary,
                 foregroundColor: Colors.white,
                 disabledBackgroundColor:
-                    AppColors.secondary.withOpacity(0.7),
+                    AppColors.secondary.withValues(alpha: 0.7),
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14)),
@@ -935,7 +926,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     )
                   : Text(
                       _alreadyInCart
-                          ? 'Go to Cart'
+                          ? LocaleService.t('go_to_cart')
                           : LocaleService.t('add_to_cart'),
                       style: const TextStyle(
                         fontSize: 16,
@@ -1047,12 +1038,12 @@ class _PdTag extends StatelessWidget {
           const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: effectiveColor != null
-            ? effectiveColor.withOpacity(0.1)
+            ? effectiveColor.withValues(alpha: 0.1)
             : AppColors.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: effectiveColor != null
-              ? effectiveColor.withOpacity(0.3)
+              ? effectiveColor.withValues(alpha: 0.3)
               : AppColors.divider,
         ),
       ),

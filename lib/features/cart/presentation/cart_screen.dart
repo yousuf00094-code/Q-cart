@@ -3,8 +3,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/services/cart_service.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/locale_service.dart';
-import '../../../core/services/api_client.dart';
 import '../../../core/utils/parse_num.dart';
+import '../../../core/utils/category_helpers.dart';
 import '../../../app_shell.dart';
 
 class CartScreen extends StatefulWidget {
@@ -46,10 +46,10 @@ class _CartScreenState extends State<CartScreen> {
     try {
       final res = await CartService.getCart();
       final data = res['data'] as Map<String, dynamic>?;
-      final rawItems =
-          (data?['items'] as List<dynamic>?)
-              ?.cast<Map<String, dynamic>>() ??
-              [];
+      final rawItems = (data?['items'] as List<dynamic>? ?? [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
       final sub = parseDouble(data?['subtotal']);
       if (mounted) {
         setState(() {
@@ -59,10 +59,10 @@ class _CartScreenState extends State<CartScreen> {
         });
         CustomerShell.of(context)?.updateCartCount(_items.length);
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = LocaleService.t('error_generic');
           _loading = false;
         });
       }
@@ -85,8 +85,6 @@ class _CartScreenState extends State<CartScreen> {
     final itemId = item['id']?.toString() ?? '';
     final oldItems = List<Map<String, dynamic>>.from(_items);
     final oldSubtotal = _subtotal;
-    final price = parseDouble(
-        (item['product'] as Map<String, dynamic>?)?['price']);
 
     if (newQty <= 0) {
       setState(() {
@@ -483,7 +481,7 @@ class _CartScreenState extends State<CartScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Coupon applied: ${parseDouble(_appliedCoupon!['discount_percentage']).toStringAsFixed(0)}% off',
+                    '${LocaleService.t('coupon_applied')}: ${parseDouble(_appliedCoupon!['discount_percentage']).toStringAsFixed(0)}%',
                     style: const TextStyle(
                       fontSize: 13,
                       color: Color(0xFF2ECC71),
@@ -573,7 +571,7 @@ class _CartScreenState extends State<CartScreen> {
             const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 16,
             offset: const Offset(0, -4),
           ),
@@ -631,7 +629,7 @@ class _CartScreenState extends State<CartScreen> {
               padding: const EdgeInsets.symmetric(
                   horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.2),
+                color: AppColors.primary.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -680,7 +678,7 @@ class _CartScreenState extends State<CartScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -791,22 +789,7 @@ class _CartItemCard extends StatelessWidget {
     );
   }
 
-  Widget _placeholder() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFD4F5E9), Color(0xFFA8E0D0)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: const Icon(
-        Icons.shopping_basket_outlined,
-        size: 36,
-        color: Colors.white70,
-      ),
-    );
-  }
+  Widget _placeholder() => productImagePlaceholder();
 }
 
 class _QuantityControl extends StatelessWidget {

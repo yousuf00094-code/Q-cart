@@ -42,7 +42,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = LocaleService.t('error_generic');
           _loading = false;
         });
       }
@@ -404,7 +404,7 @@ class _WishlistItemCardState
                             decoration: BoxDecoration(
                               color: _movingToCart
                                   ? AppColors.secondary
-                                      .withOpacity(0.7)
+                                      .withValues(alpha: 0.7)
                                   : AppColors.secondary,
                               borderRadius:
                                   BorderRadius.circular(10),
