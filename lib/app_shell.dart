@@ -20,7 +20,7 @@ class CustomerShell extends StatefulWidget {
 
 class CustomerShellState extends State<CustomerShell> {
   late int _index;
-  int _cartCount = 0;
+  int _cartCount    = 0;
   int _wishlistCount = 0;
 
   @override
@@ -58,76 +58,122 @@ class CustomerShellState extends State<CustomerShell> {
   Widget _buildShell(BuildContext context) {
     return Scaffold(
       body: IndexedStack(index: _index, children: _screens),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: Color(0xFFEEF0F3), width: 1)),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _index,
-          onTap: (i) => setState(() => _index = i),
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: AppColors.background,
-          selectedItemColor: AppColors.secondary,
-          unselectedItemColor: AppColors.textSecondary,
-          selectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-          unselectedLabelStyle: const TextStyle(fontSize: 11),
-          elevation: 0,
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.home_outlined),
-            activeIcon: const Icon(Icons.home),
-            label: LocaleService.t('home'),
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.grid_view_outlined),
-            activeIcon: const Icon(Icons.grid_view),
-            label: LocaleService.t('categories'),
-          ),
-          BottomNavigationBarItem(
-            icon: _badge(_cartCount, Icons.shopping_cart_outlined),
-            activeIcon: _badge(_cartCount, Icons.shopping_cart),
-            label: LocaleService.t('cart'),
-          ),
-          BottomNavigationBarItem(
-            icon: _badge(_wishlistCount, Icons.favorite_border),
-            activeIcon: _badge(_wishlistCount, Icons.favorite),
-            label: LocaleService.t('wishlist'),
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.person_outline),
-            activeIcon: const Icon(Icons.person),
-            label: LocaleService.t('profile'),
+      bottomNavigationBar: _buildBottomNav(context),
+    );
+  }
+
+  Widget _buildBottomNav(BuildContext context) {
+    final items = [
+      _NavItem(Icons.home_rounded,          Icons.home_outlined,            LocaleService.t('home')),
+      _NavItem(Icons.grid_view_rounded,     Icons.grid_view_outlined,       LocaleService.t('categories')),
+      _NavItem(Icons.shopping_cart_rounded, Icons.shopping_cart_outlined,   LocaleService.t('cart'),     badge: _cartCount),
+      _NavItem(Icons.favorite_rounded,      Icons.favorite_outline,         LocaleService.t('wishlist'), badge: _wishlistCount),
+      _NavItem(Icons.person_rounded,        Icons.person_outline,           LocaleService.t('profile')),
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.09),
+            blurRadius: 16,
+            offset: const Offset(0, -3),
           ),
         ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 62,
+          child: Row(
+            children: List.generate(items.length, (i) {
+              final item   = items[i];
+              final active = _index == i;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _index = i),
+                  behavior: HitTestBehavior.opaque,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Active indicator bar at top
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        width: active ? 28 : 0,
+                        height: 3,
+                        margin: const EdgeInsets.only(bottom: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(1.5),
+                        ),
+                      ),
+                      // Icon with badge
+                      Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.center,
+                        children: [
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(
+                              active ? item.activeIcon : item.icon,
+                              key: ValueKey(active),
+                              size: 24,
+                              color: active
+                                  ? AppColors.primary
+                                  : const Color(0xFFAAAAAA),
+                            ),
+                          ),
+                          if (item.badge > 0)
+                            Positioned(
+                              right: -10, top: -5,
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFE5002B),
+                                  shape: BoxShape.circle,
+                                ),
+                                constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+                                child: Text(
+                                  item.badge > 99 ? '99+' : '${item.badge}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.label,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                          color: active
+                              ? AppColors.primary
+                              : const Color(0xFFAAAAAA),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
         ),
       ),
     );
   }
+}
 
-  Widget _badge(int count, IconData icon) {
-    if (count == 0) return Icon(icon);
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Icon(icon),
-        Positioned(
-          right: -6,
-          top: -4,
-          child: Container(
-            padding: const EdgeInsets.all(2),
-            decoration: const BoxDecoration(
-              color: Color(0xFFE53935),
-              shape: BoxShape.circle,
-            ),
-            constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-            child: Text(
-              count > 99 ? '99+' : '$count',
-              style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+class _NavItem {
+  final IconData activeIcon;
+  final IconData icon;
+  final String label;
+  final int badge;
+  const _NavItem(this.activeIcon, this.icon, this.label, {this.badge = 0});
 }

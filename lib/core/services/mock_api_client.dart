@@ -143,7 +143,7 @@ class MockApiClient {
   // ── Product image generation ─────────────────────────────────────────────
 
   static String _productImage(String catId, int n, bool flip) {
-    return '/img/products/p$n.png';
+    return 'img/products/p$n.png';
   }
 
   static Map<String, dynamic> _withImages(Map<String, dynamic> p) {
