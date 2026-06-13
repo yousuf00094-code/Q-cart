@@ -66,26 +66,20 @@ class CustomerShellState extends State<CustomerShell> {
     final items = [
       _NavItem(Icons.home_rounded,          Icons.home_outlined,            LocaleService.t('home')),
       _NavItem(Icons.grid_view_rounded,     Icons.grid_view_outlined,       LocaleService.t('categories')),
-      _NavItem(Icons.shopping_cart_rounded, Icons.shopping_cart_outlined,   LocaleService.t('cart'),     badge: _cartCount),
+      _NavItem(Icons.shopping_bag_rounded,  Icons.shopping_bag_outlined,   LocaleService.t('cart'),     badge: _cartCount),
       _NavItem(Icons.favorite_rounded,      Icons.favorite_outline,         LocaleService.t('wishlist'), badge: _wishlistCount),
       _NavItem(Icons.person_rounded,        Icons.person_outline,           LocaleService.t('profile')),
     ];
 
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.09),
-            blurRadius: 16,
-            offset: const Offset(0, -3),
-          ),
-        ],
+        border: Border(top: BorderSide(color: Color(0xFFE8E8E8), width: 1)),
       ),
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 62,
+          height: 56,
           child: Row(
             children: List.generate(items.length, (i) {
               final item   = items[i];
@@ -97,65 +91,50 @@ class CustomerShellState extends State<CustomerShell> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Active indicator bar at top
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        width: active ? 28 : 0,
-                        height: 3,
-                        margin: const EdgeInsets.only(bottom: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(1.5),
-                        ),
-                      ),
-                      // Icon with badge
                       Stack(
                         clipBehavior: Clip.none,
                         alignment: Alignment.center,
                         children: [
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 200),
-                            child: Icon(
-                              active ? item.activeIcon : item.icon,
-                              key: ValueKey(active),
-                              size: 24,
-                              color: active
-                                  ? AppColors.primary
-                                  : const Color(0xFFAAAAAA),
-                            ),
+                          Icon(
+                            active ? item.activeIcon : item.icon,
+                            size: 24,
+                            color: active
+                                ? AppColors.primary
+                                : const Color(0xFFBBBBBB),
                           ),
                           if (item.badge > 0)
                             Positioned(
-                              right: -10, top: -5,
+                              right: -9, top: -5,
                               child: Container(
                                 padding: const EdgeInsets.all(2),
                                 decoration: const BoxDecoration(
                                   color: Color(0xFFE5002B),
                                   shape: BoxShape.circle,
                                 ),
-                                constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+                                constraints: const BoxConstraints(
+                                    minWidth: 16, minHeight: 16),
                                 child: Text(
                                   item.badge > 99 ? '99+' : '${item.badge}',
                                   style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                                      color: Colors.white, fontSize: 9,
+                                      fontWeight: FontWeight.w800),
                                   textAlign: TextAlign.center,
                                 ),
                               ),
                             ),
                         ],
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
                       Text(
                         item.label,
                         style: TextStyle(
                           fontSize: 10,
-                          fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                          fontWeight: active
+                              ? FontWeight.w700
+                              : FontWeight.w400,
                           color: active
                               ? AppColors.primary
-                              : const Color(0xFFAAAAAA),
+                              : const Color(0xFFBBBBBB),
                         ),
                       ),
                     ],
