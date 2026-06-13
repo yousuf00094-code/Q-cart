@@ -13,11 +13,17 @@ class ProductListingScreen extends StatefulWidget {
     this.categoryId,
     this.categoryName,
     this.initialSearch,
+    this.title,
+    this.sort,
+    this.featured = false,
   });
 
   final String? categoryId;
   final String? categoryName;
   final String? initialSearch;
+  final String? title;
+  final String? sort;
+  final bool featured;
 
   @override
   State<ProductListingScreen> createState() => _ProductListingScreenState();
@@ -54,6 +60,7 @@ class _ProductListingScreenState extends State<ProductListingScreen> {
   void initState() {
     super.initState();
     _searchController.text = widget.initialSearch ?? '';
+    if (widget.sort != null) _sort = widget.sort!;
     _scrollController.addListener(_onScroll);
     _fetchProducts(reset: true);
   }
@@ -94,6 +101,7 @@ class _ProductListingScreenState extends State<ProductListingScreen> {
         minPrice: _minPrice > 0 ? _minPrice : null,
         maxPrice: _maxPrice < 1000 ? _maxPrice : null,
         sort: _sort,
+        featured: widget.featured,
       );
       final rawList = res['data'];
       final data = rawList is List
@@ -142,6 +150,7 @@ class _ProductListingScreenState extends State<ProductListingScreen> {
         minPrice: _minPrice > 0 ? _minPrice : null,
         maxPrice: _maxPrice < 1000 ? _maxPrice : null,
         sort: _sort,
+        featured: widget.featured,
       );
       final rawList = res['data'];
       final data = rawList is List
@@ -230,23 +239,24 @@ class _ProductListingScreenState extends State<ProductListingScreen> {
         onPressed: () => Navigator.pop(context),
         icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: AppColors.textPrimary),
       ),
-      title: TextField(
-        controller: _searchController,
-        autofocus: true,
-        textInputAction: TextInputAction.search,
-        onSubmitted: (_) => _fetchProducts(reset: true),
-        decoration: InputDecoration(
-          hintText: LocaleService.t('search_hint'),
-          hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
-          border: InputBorder.none,
-          isDense: true,
-          contentPadding: EdgeInsets.zero,
-        ),
-        style: const TextStyle(
-          fontSize: 15,
-          color: AppColors.textPrimary,
-        ),
-      ),
+      title: widget.title != null
+          ? Text(widget.title!,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary))
+          : TextField(
+              controller: _searchController,
+              autofocus: widget.title == null && widget.initialSearch == null,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (_) => _fetchProducts(reset: true),
+              decoration: InputDecoration(
+                hintText: LocaleService.t('search_hint'),
+                hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+              style: const TextStyle(fontSize: 15, color: AppColors.textPrimary),
+            ),
       actions: [
         IconButton(
           onPressed: () => _showFilterSheet(context),
@@ -355,7 +365,7 @@ class _ProductListingScreenState extends State<ProductListingScreen> {
               ),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                childAspectRatio: 0.72,
+                childAspectRatio: 0.68,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
               ),
@@ -575,7 +585,7 @@ String? _extractImageUrl(Map<String, dynamic> product) {
 
 Widget _gridImageFallback() {
   return SizedBox(
-    height: 130,
+    height: 140,
     width: double.infinity,
     child: productImagePlaceholder(),
   );
@@ -619,9 +629,15 @@ class _ProductGridCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.divider),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -633,7 +649,7 @@ class _ProductGridCard extends StatelessWidget {
                   child: imageUrl != null
                       ? Image.network(
                           imageUrl,
-                          height: 130,
+                          height: 140,
                           width: double.infinity,
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => _gridImageFallback(),
@@ -685,6 +701,21 @@ class _ProductGridCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(height: 4),
+                    Builder(builder: (_) {
+                      final rating = parseDouble(product['average_rating']);
+                      if (rating <= 0) return const SizedBox.shrink();
+                      return Row(
+                        children: [
+                          const Icon(Icons.star_rounded, size: 12, color: Color(0xFFFBBF24)),
+                          const SizedBox(width: 2),
+                          Text(
+                            rating.toStringAsFixed(1),
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          ),
+                        ],
+                      );
+                    }),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
