@@ -496,23 +496,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildCategoriesRow(BuildContext context) {
     if (_categoriesLoading) {
-      return const SizedBox(
-        height: 102,
-        child: Center(child: CircularProgressIndicator(color: AppColors.secondary)),
-      );
+      return _buildCategoriesSkeleton();
     }
     if (_categoriesError != null) {
-      return SizedBox(
-        height: 102,
-        child: Center(
-          child: TextButton.icon(
-            onPressed: _fetchCategories,
-            icon: const Icon(Icons.refresh, size: 16),
-            label: Text(LocaleService.t('retry')),
-            style: TextButton.styleFrom(foregroundColor: AppColors.secondary),
-          ),
-        ),
-      );
+      return _buildCategoriesSkeleton(showRetry: true, onRetry: _fetchCategories);
     }
     final displayCategories = _categories.take(8).toList();
     return SizedBox(
@@ -593,51 +580,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     const rowHeight = 265.0;
     if (loading) {
-      return const SizedBox(
-        height: rowHeight,
-        child: Center(child: CircularProgressIndicator(color: AppColors.secondary)),
-      );
+      return _buildProductRowSkeleton(rowHeight);
     }
     if (error != null) {
-      return SizedBox(
-        height: rowHeight,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.wifi_off_outlined, size: 32, color: AppColors.textSecondary),
-              const SizedBox(height: 8),
-              Text(
-                LocaleService.t('error_generic'),
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh, size: 16),
-                label: Text(LocaleService.t('retry')),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.secondary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  elevation: 0,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+      return _buildProductRowSkeleton(rowHeight, showRetry: true, onRetry: onRetry);
     }
     if (items.isEmpty) {
-      return SizedBox(
-        height: rowHeight,
-        child: Center(
-          child: Text(LocaleService.t('no_products'),
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-        ),
-      );
+      return _buildProductRowSkeleton(rowHeight);
     }
     return SizedBox(
       height: rowHeight,
@@ -662,49 +611,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildNewArrivalsGrid(BuildContext context) {
     if (_newArrivalsLoading) {
-      return const SizedBox(
-        height: 200,
-        child: Center(child: CircularProgressIndicator(color: AppColors.secondary)),
-      );
+      return _buildGridSkeleton();
     }
     if (_newArrivalsError != null) {
-      return SizedBox(
-        height: 200,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.wifi_off_outlined, size: 32, color: AppColors.textSecondary),
-              const SizedBox(height: 8),
-              Text(
-                LocaleService.t('error_generic'),
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton.icon(
-                onPressed: _fetchNewArrivals,
-                icon: const Icon(Icons.refresh, size: 16),
-                label: Text(LocaleService.t('retry')),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.secondary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  elevation: 0,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+      return _buildGridSkeleton(showRetry: true, onRetry: _fetchNewArrivals);
     }
     if (_newArrivals.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Text(LocaleService.t('no_products'),
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-      );
+      return _buildGridSkeleton();
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -728,6 +641,202 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  // ── Skeleton helpers ─────────────────────────────────────────────────────────
+
+  Widget _skeletonBox({double? w, required double h, double radius = 8}) {
+    return Container(
+      width: w,
+      height: h,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEDF0F3),
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+  }
+
+  Widget _buildCategoriesSkeleton({bool showRetry = false, VoidCallback? onRetry}) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        SizedBox(
+          height: 102,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 7,
+            separatorBuilder: (_, __) => const SizedBox(width: 14),
+            itemBuilder: (_, __) => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _skeletonBox(w: 64, h: 64, radius: 18),
+                const SizedBox(height: 6),
+                _skeletonBox(w: 44, h: 10, radius: 5),
+              ],
+            ),
+          ),
+        ),
+        if (showRetry)
+          GestureDetector(
+            onTap: onRetry,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8)],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.refresh, size: 14, color: AppColors.secondary),
+                  const SizedBox(width: 4),
+                  Text(LocaleService.t('retry'), style: const TextStyle(fontSize: 12, color: AppColors.secondary, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildProductRowSkeleton(double rowHeight, {bool showRetry = false, VoidCallback? onRetry}) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        SizedBox(
+          height: rowHeight,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 4,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (_, __) => Container(
+              width: 168,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF6F8FA),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _skeletonBox(h: 150, radius: 0),
+                  Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _skeletonBox(w: double.infinity, h: 12),
+                        const SizedBox(height: 6),
+                        _skeletonBox(w: 100, h: 12),
+                        const SizedBox(height: 14),
+                        _skeletonBox(w: 70, h: 14, radius: 7),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (showRetry)
+          GestureDetector(
+            onTap: onRetry,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.refresh, size: 14, color: AppColors.secondary),
+                  const SizedBox(width: 6),
+                  Text(LocaleService.t('retry'), style: const TextStyle(fontSize: 13, color: AppColors.secondary, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildGridSkeleton({bool showRetry = false, VoidCallback? onRetry}) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.66,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+            ),
+            itemCount: 6,
+            itemBuilder: (_, __) => Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF6F8FA),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 6,
+                    child: _skeletonBox(h: double.infinity, radius: 0),
+                  ),
+                  Expanded(
+                    flex: 4,
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _skeletonBox(w: double.infinity, h: 12),
+                          const SizedBox(height: 6),
+                          _skeletonBox(w: 80, h: 12),
+                          const Spacer(),
+                          _skeletonBox(w: 60, h: 14, radius: 7),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (showRetry)
+          GestureDetector(
+            onTap: onRetry,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.refresh, size: 14, color: AppColors.secondary),
+                  const SizedBox(width: 6),
+                  Text(LocaleService.t('retry'), style: const TextStyle(fontSize: 13, color: AppColors.secondary, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
