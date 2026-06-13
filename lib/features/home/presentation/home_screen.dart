@@ -312,12 +312,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.25),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       LocaleService.t('limited_offer'),
-                      style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600),
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -340,7 +340,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            const Icon(Icons.local_offer_outlined, size: 72, color: Colors.white24),
+            const Icon(Icons.local_offer_outlined, size: 72, color: Colors.white38),
           ],
         ),
       ),
@@ -484,12 +484,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 4),
-              const Text(
-                'Server may be starting up — tap Retry',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                textAlign: TextAlign.center,
-              ),
               const SizedBox(height: 10),
               ElevatedButton.icon(
                 onPressed: onRetry,
@@ -526,6 +520,7 @@ class _HomeScreenState extends State<HomeScreen> {
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) => _ProductCard(
           product: items[index],
+          fixedWidth: 168,
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
@@ -551,15 +546,25 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_newArrivalsError!,
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                  textAlign: TextAlign.center),
+              const Icon(Icons.wifi_off_outlined, size: 32, color: AppColors.textSecondary),
               const SizedBox(height: 8),
-              TextButton.icon(
+              Text(
+                LocaleService.t('error_generic'),
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton.icon(
                 onPressed: _fetchNewArrivals,
                 icon: const Icon(Icons.refresh, size: 16),
                 label: Text(LocaleService.t('retry')),
-                style: TextButton.styleFrom(foregroundColor: AppColors.secondary),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.secondary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
               ),
             ],
           ),
@@ -685,10 +690,11 @@ String? _extractImageUrl(Map<String, dynamic> product) {
 // ── Product card ─────────────────────────────────────────────────────────────
 
 class _ProductCard extends StatelessWidget {
-  const _ProductCard({required this.product, required this.onTap});
+  const _ProductCard({required this.product, required this.onTap, this.fixedWidth});
 
   final Map<String, dynamic> product;
   final VoidCallback onTap;
+  final double? fixedWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -711,7 +717,7 @@ class _ProductCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 168,
+        width: fixedWidth,
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
@@ -843,7 +849,7 @@ class _ProductCard extends StatelessWidget {
 
   Widget _errorCard() {
     return Container(
-      width: 168,
+      width: fixedWidth,
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
