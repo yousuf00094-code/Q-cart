@@ -22,6 +22,7 @@ class CustomerService {
     double? maxPrice,
     String sort = 'newest',
     bool featured = false,
+    bool flashDeals = false,
   }) async {
     final params = <String, String>{
       'page': page.toString(),
@@ -32,6 +33,7 @@ class CustomerService {
       if (minPrice != null) 'min_price': minPrice.toString(),
       if (maxPrice != null) 'max_price': maxPrice.toString(),
       if (featured) 'featured': 'true',
+      if (flashDeals) 'flash_deals': 'true',
     };
     final qs = params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
     return ApiClient.get('/products?$qs');

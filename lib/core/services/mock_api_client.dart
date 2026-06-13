@@ -143,8 +143,7 @@ class MockApiClient {
   // ── Product image generation ─────────────────────────────────────────────
 
   static String _productImage(String catId, int n, bool flip) {
-    final variant = flip ? 1 : 0;
-    return '/img/${catId}_$variant.png';
+    return '/img/products/p$n.png';
   }
 
   static Map<String, dynamic> _withImages(Map<String, dynamic> p) {
@@ -185,6 +184,19 @@ class MockApiClient {
         final tags = p['tags'] as List<dynamic>;
         return tags.contains('featured');
       }).toList();
+    }
+
+    if (q['flash_deals'] == 'true') {
+      items = items.where((p) => (p['compare_at_price'] as double?) != null).toList();
+      items.sort((a, b) {
+        final ap = a['price'] as double;
+        final ac = a['compare_at_price'] as double;
+        final bp = b['price'] as double;
+        final bc = b['compare_at_price'] as double;
+        final discA = 1 - ap / ac;
+        final discB = 1 - bp / bc;
+        return discB.compareTo(discA);
+      });
     }
 
     final minPrice = double.tryParse(q['min_price'] ?? '');
