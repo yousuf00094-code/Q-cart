@@ -236,19 +236,14 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              border: Border.all(color: AppColors.divider),
+              color: AppColors.secondary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               LocaleService.isArabic ? 'EN' : 'AR',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.secondary),
             ),
           ),
-        ),
-        IconButton(
-          onPressed: () {},
-          icon: const Icon(Icons.notifications_outlined),
-          color: AppColors.textPrimary,
         ),
         IconButton(
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen())),
@@ -266,11 +261,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: GestureDetector(
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductListingScreen())),
         child: Container(
-          height: 50,
+          height: 52,
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: const Color(0xFFF4F6F8),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.divider),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Row(
@@ -291,58 +285,156 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildPromoBanner(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        width: double.infinity,
-        height: 160,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppColors.secondary, Color(0xFF6D69A8)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+      child: GestureDetector(
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductListingScreen())),
+        child: Container(
+          width: double.infinity,
+          height: 170,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF3D3A6B), Color(0xFF5A56A0)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
           ),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      LocaleService.t('limited_offer'),
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                    ),
+          clipBehavior: Clip.hardEdge,
+          child: Stack(
+            children: [
+              Positioned(
+                right: -35,
+                top: -35,
+                child: Container(
+                  width: 160,
+                  height: 160,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.07),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    LocaleService.t('promo_title'),
-                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700, height: 1.2),
+                ),
+              ),
+              Positioned(
+                right: 55,
+                bottom: -28,
+                child: Container(
+                  width: 85,
+                  height: 85,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.05),
                   ),
-                  const SizedBox(height: 12),
-                  GestureDetector(
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductListingScreen())),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20)),
-                      child: Text(
-                        LocaleService.t('shop_now'),
-                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 16, 18),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFBBF24),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              LocaleService.t('limited_offer'),
+                              style: const TextStyle(
+                                color: Color(0xFF1C1A2E),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            LocaleService.t('promo_title'),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  LocaleService.t('shop_now'),
+                                  style: const TextStyle(
+                                    color: Color(0xFF4D4A7D),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFF4D4A7D)),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.13),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'UP TO',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          Text(
+                            '20%',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 26,
+                              fontWeight: FontWeight.w900,
+                              height: 1.1,
+                            ),
+                          ),
+                          Text(
+                            'OFF',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const Icon(Icons.local_offer_outlined, size: 72, color: Colors.white38),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -352,14 +444,49 @@ class _HomeScreenState extends State<HomeScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+          Container(
+            width: 4,
+            height: 20,
+            decoration: BoxDecoration(
+              color: AppColors.secondary,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
           GestureDetector(
             onTap: onTap,
-            child: Text(
-              LocaleService.t('see_all'),
-              style: const TextStyle(color: AppColors.secondary, fontSize: 13, fontWeight: FontWeight.w500),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.secondary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    LocaleService.t('see_all'),
+                    style: const TextStyle(
+                      color: AppColors.secondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  const Icon(Icons.chevron_right, size: 16, color: AppColors.secondary),
+                ],
+              ),
             ),
           ),
         ],
@@ -464,7 +591,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required String? error,
     required VoidCallback onRetry,
   }) {
-    const rowHeight = 252.0;
+    const rowHeight = 265.0;
     if (loading) {
       return const SizedBox(
         height: rowHeight,
@@ -586,7 +713,7 @@ class _HomeScreenState extends State<HomeScreen> {
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          childAspectRatio: 0.70,
+          childAspectRatio: 0.66,
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
         ),
@@ -650,14 +777,13 @@ class _ProductCard extends StatelessWidget {
       child: Container(
         width: fixedWidth,
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.divider),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: Colors.black.withValues(alpha: 0.07),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -670,7 +796,7 @@ class _ProductCard extends StatelessWidget {
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                   child: SizedBox(
-                    height: 130,
+                    height: 150,
                     width: double.infinity,
                     child: imageUrl != null
                         ? Image.network(

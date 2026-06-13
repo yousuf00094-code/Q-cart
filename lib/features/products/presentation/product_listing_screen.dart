@@ -355,7 +355,7 @@ class _ProductListingScreenState extends State<ProductListingScreen> {
               ),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                childAspectRatio: 0.72,
+                childAspectRatio: 0.68,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
               ),
@@ -575,7 +575,7 @@ String? _extractImageUrl(Map<String, dynamic> product) {
 
 Widget _gridImageFallback() {
   return SizedBox(
-    height: 130,
+    height: 140,
     width: double.infinity,
     child: productImagePlaceholder(),
   );
@@ -619,9 +619,15 @@ class _ProductGridCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.divider),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -633,7 +639,7 @@ class _ProductGridCard extends StatelessWidget {
                   child: imageUrl != null
                       ? Image.network(
                           imageUrl,
-                          height: 130,
+                          height: 140,
                           width: double.infinity,
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => _gridImageFallback(),
@@ -685,6 +691,21 @@ class _ProductGridCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(height: 4),
+                    Builder(builder: (_) {
+                      final rating = parseDouble(product['average_rating']);
+                      if (rating <= 0) return const SizedBox.shrink();
+                      return Row(
+                        children: [
+                          const Icon(Icons.star_rounded, size: 12, color: Color(0xFFFBBF24)),
+                          const SizedBox(width: 2),
+                          Text(
+                            rating.toStringAsFixed(1),
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          ),
+                        ],
+                      );
+                    }),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
